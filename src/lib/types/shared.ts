@@ -17,7 +17,6 @@ import type {
   MotivationStyle,
   NotificationChannel,
   NotificationType,
-  PreferredStudyTime,
   RiskLevel,
   SessionType,
   Theme,
@@ -33,17 +32,31 @@ import type {
 export interface UserProfile {
   id: string;                                   // UUID, PK, FK to auth.users
   email: string;
-  full_name: string | null;
+  display_name: string;                         // NOT NULL, default ''
   avatar_url: string | null;
   timezone: string;                             // default 'UTC'
   theme: Theme;                                 // 'light' | 'dark' | 'system'
-  motivation_style: MotivationStyle;            // 'gentle' | 'tough_love' | 'data_driven' | 'balanced'
-  preferred_study_days: DayOfWeek[];            // JSONB, e.g. ["mon","tue","wed","thu","fri"]
-  preferred_study_time: PreferredStudyTime;     // 'morning' | 'afternoon' | 'evening' | 'night'
-  daily_study_goal_minutes: number;             // default 60
+  motivation_style: MotivationStyle;            // 'gentle' | 'balanced' | 'drill_sergeant'
   experience_level: ExperienceLevel;            // 'beginner' | 'intermediate' | 'advanced'
+  learning_goals: string[];                     // text[], default '{}'
+  preferred_days: DayOfWeek[];                  // text[], e.g. ['mon','tue','wed']
+  preferred_time_start: string | null;          // time, default '09:00'
+  preferred_time_end: string | null;            // time, default '17:00'
+  daily_study_goal_mins: number;                // default 60
+  weekly_study_goal_mins: number;               // default 300
+  notify_email: boolean;                        // default true
+  notify_push: boolean;                         // default true
+  notify_slack: boolean;                        // default false
+  notify_discord: boolean;                      // default false
+  notify_daily_reminder: boolean;               // default true
+  notify_streak_warning: boolean;               // default true
+  notify_weekly_report: boolean;                // default true
+  notify_achievement: boolean;                  // default true
+  notify_risk_alert: boolean;                   // default true
+  slack_webhook_url: string | null;
+  discord_webhook_url: string | null;
   onboarding_completed: boolean;                // default false
-  streak_freeze_count: number;                  // default 3
+  onboarding_step: number;                      // default 0
   created_at: string;                           // ISO 8601 timestamptz
   updated_at: string;                           // ISO 8601 timestamptz
 }
@@ -304,7 +317,7 @@ export interface TodaysPlanCourse {
 // BuddyActivity -- Activity summary for a study buddy
 // -----------------------------------------------------------------------------
 export interface BuddyActivity {
-  profile: Pick<UserProfile, 'id' | 'full_name' | 'avatar_url'>;
+  profile: Pick<UserProfile, 'id' | 'display_name' | 'avatar_url'>;
   streak: number;
   hours_this_week: number;
   active_courses_count: number;

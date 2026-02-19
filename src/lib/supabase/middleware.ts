@@ -31,17 +31,55 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+
   // Redirect unauthenticated users to login (except for auth routes and API routes)
   if (
     !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/signup') &&
-    !request.nextUrl.pathname.startsWith('/api/auth') &&
-    !request.nextUrl.pathname.startsWith('/api/cron')
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/signup') &&
+    !pathname.startsWith('/api/auth') &&
+    !pathname.startsWith('/api/cron')
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
+  }
+
+  // Onboarding gate: check if authenticated user has completed onboarding
+  if (
+    user &&
+    !pathname.startsWith('/onboarding') &&
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/signup') &&
+    !pathname.startsWith('/api/')
+  ) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .single();
+
+    if (profile && !profile.onboarding_completed) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/onboarding';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Redirect already-onboarded users away from /onboarding
+  if (user && pathname.startsWith('/onboarding')) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.onboarding_completed) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/settings/profile';
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;

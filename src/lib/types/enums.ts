@@ -59,9 +59,8 @@ export type SessionType = (typeof SESSION_TYPE)[keyof typeof SESSION_TYPE];
 // -----------------------------------------------------------------------------
 export const MOTIVATION_STYLE = {
   GENTLE: 'gentle',
-  TOUGH_LOVE: 'tough_love',
-  DATA_DRIVEN: 'data_driven',
   BALANCED: 'balanced',
+  DRILL_SERGEANT: 'drill_sergeant',
 } as const;
 
 export type MotivationStyle = (typeof MOTIVATION_STYLE)[keyof typeof MOTIVATION_STYLE];
@@ -76,19 +75,6 @@ export const EXPERIENCE_LEVEL = {
 } as const;
 
 export type ExperienceLevel = (typeof EXPERIENCE_LEVEL)[keyof typeof EXPERIENCE_LEVEL];
-
-// -----------------------------------------------------------------------------
-// Preferred Study Time
-// -----------------------------------------------------------------------------
-export const PREFERRED_STUDY_TIME = {
-  MORNING: 'morning',
-  AFTERNOON: 'afternoon',
-  EVENING: 'evening',
-  NIGHT: 'night',
-} as const;
-
-export type PreferredStudyTime =
-  (typeof PREFERRED_STUDY_TIME)[keyof typeof PREFERRED_STUDY_TIME];
 
 // -----------------------------------------------------------------------------
 // Theme
