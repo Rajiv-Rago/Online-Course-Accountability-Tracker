@@ -1,11 +1,28 @@
+'use client';
+
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { CourseForm } from '@/blocks/b2-course-management/components/course-form';
+
 export default function NewCoursePage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Add New Course</h1>
-      <p className="text-muted-foreground mb-4">Block B2 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Add a new course to track.
-      </p>
+    <div className="space-y-6">
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/courses">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Courses
+        </Link>
+      </Button>
+
+      <div>
+        <h1 className="text-2xl font-bold">Add New Course</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Start tracking a new course in your learning journey.
+        </p>
+      </div>
+
+      <CourseForm mode="create" />
     </div>
   );
 }
