@@ -123,10 +123,14 @@ export async function updateSession(
       .split('T')[0];
     await upsertDailyStats(userId, sessionDate);
 
-    // Update course progress if modules changed
-    if (parsed.modulesCompleted !== undefined) {
-      const modulesDiff = parsed.modulesCompleted - existing.modules_completed;
-      const durationDiff = (parsed.durationMinutes ?? existing.duration_minutes) - existing.duration_minutes;
+    // Update course progress if modules or duration changed
+    const modulesDiff = parsed.modulesCompleted !== undefined
+      ? parsed.modulesCompleted - existing.modules_completed
+      : 0;
+    const durationDiff = parsed.durationMinutes !== undefined
+      ? parsed.durationMinutes - existing.duration_minutes
+      : 0;
+    if (modulesDiff !== 0 || durationDiff !== 0) {
       await updateCourseProgress(supabase, existing.course_id, modulesDiff, durationDiff);
     }
 

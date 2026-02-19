@@ -174,17 +174,75 @@ export async function applyStreakFreeze(
     if (profile.streak_freeze_count <= 0)
       return { error: 'No streak freezes remaining' };
 
-    // Upsert daily_stats for the freeze date (streak_day = true, total_minutes = 0)
+    // Atomically decrement freeze count (prevents double-spend on concurrent requests)
+    const { data: updated, error: updateError } = await supabase.rpc(
+      'decrement_streak_freeze',
+      { p_user_id: userId }
+    ).maybeSingle();
+
+    // If RPC doesn't exist, fall back to guarded update
+    if (updateError?.message?.includes('function') || updateError?.code === '42883') {
+      // Fallback: use a conditional update that only decrements if count > 0
+      const { data: updatedProfile, error: fallbackError } = await supabase
+        .from('user_profiles')
+        .update({ streak_freeze_count: Math.max(0, profile.streak_freeze_count - 1) })
+        .eq('id', userId)
+        .gt('streak_freeze_count', 0)
+        .select('streak_freeze_count')
+        .single();
+
+      if (fallbackError) return { error: fallbackError.message };
+      if (!updatedProfile) return { error: 'No streak freezes remaining' };
+
+      // Upsert daily_stats: only set streak_day = true, preserve existing study data
+      const { data: existingStats } = await supabase
+        .from('daily_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('date', date)
+        .maybeSingle();
+
+      const { error: upsertError } = await supabase
+        .from('daily_stats')
+        .upsert(
+          {
+            user_id: userId,
+            date,
+            total_minutes: existingStats?.total_minutes ?? 0,
+            session_count: existingStats?.session_count ?? 0,
+            modules_completed: existingStats?.modules_completed ?? 0,
+            courses_studied: existingStats?.courses_studied ?? [],
+            streak_day: true,
+          },
+          { onConflict: 'user_id,date' }
+        );
+
+      if (upsertError) return { error: upsertError.message };
+
+      revalidatePath('/progress');
+      return { data: { remainingFreezes: updatedProfile.streak_freeze_count } };
+    }
+
+    if (updateError) return { error: updateError.message };
+
+    // Upsert daily_stats: only set streak_day = true, preserve existing study data
+    const { data: existingStats } = await supabase
+      .from('daily_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', date)
+      .maybeSingle();
+
     const { error: upsertError } = await supabase
       .from('daily_stats')
       .upsert(
         {
           user_id: userId,
           date,
-          total_minutes: 0,
-          session_count: 0,
-          modules_completed: 0,
-          courses_studied: [],
+          total_minutes: existingStats?.total_minutes ?? 0,
+          session_count: existingStats?.session_count ?? 0,
+          modules_completed: existingStats?.modules_completed ?? 0,
+          courses_studied: existingStats?.courses_studied ?? [],
           streak_day: true,
         },
         { onConflict: 'user_id,date' }
@@ -192,14 +250,8 @@ export async function applyStreakFreeze(
 
     if (upsertError) return { error: upsertError.message };
 
-    // Decrement freeze count
-    const newCount = profile.streak_freeze_count - 1;
-    const { error: updateError } = await supabase
-      .from('user_profiles')
-      .update({ streak_freeze_count: newCount })
-      .eq('id', userId);
-
-    if (updateError) return { error: updateError.message };
+    const newCount = (updated as { streak_freeze_count?: number })?.streak_freeze_count
+      ?? Math.max(0, profile.streak_freeze_count - 1);
 
     revalidatePath('/progress');
     return { data: { remainingFreezes: newCount } };

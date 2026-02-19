@@ -4,10 +4,23 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { StudySession } from '@/lib/types';
 import { useSessions, useSessionMutations } from '../hooks/use-sessions';
 import { SessionItem } from './session-item';
 import { SessionEditDialog } from './session-edit-dialog';
+
+type SessionWithCourse = StudySession & {
+  course_title: string;
+  course_platform: string | null;
+};
 
 interface SessionListProps {
   courseFilter?: string;
@@ -25,19 +38,24 @@ export function SessionList({ courseFilter, limit = 10 }: SessionListProps) {
   } = useSessions({ courseId: courseFilter, limit });
   const mutations = useSessionMutations();
 
-  const [editingSession, setEditingSession] = useState<
-    (StudySession & { course_title?: string }) | null
-  >(null);
+  const [editingSession, setEditingSession] = useState<SessionWithCourse | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
   const sessions = data?.pages.flatMap((page) => page.sessions) ?? [];
 
-  const handleEdit = (session: StudySession) => {
-    setEditingSession(session as StudySession & { course_title?: string });
+  const handleEdit = (session: SessionWithCourse) => {
+    setEditingSession(session);
   };
 
   const handleDelete = (sessionId: string) => {
-    if (confirm('Delete this session? This cannot be undone.')) {
-      mutations.deleteSession.mutate(sessionId);
+    setDeletingSessionId(sessionId);
+  };
+
+  const confirmDelete = () => {
+    if (deletingSessionId) {
+      mutations.deleteSession.mutate(deletingSessionId, {
+        onSettled: () => setDeletingSessionId(null),
+      });
     }
   };
 
@@ -122,6 +140,45 @@ export function SessionList({ courseFilter, limit = 10 }: SessionListProps) {
           isSaving={mutations.updateSession.isPending}
         />
       )}
+
+      <Dialog
+        open={!!deletingSessionId}
+        onOpenChange={(open) => {
+          if (!open) setDeletingSessionId(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this session? This action cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingSessionId(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={mutations.deleteSession.isPending}
+            >
+              {mutations.deleteSession.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

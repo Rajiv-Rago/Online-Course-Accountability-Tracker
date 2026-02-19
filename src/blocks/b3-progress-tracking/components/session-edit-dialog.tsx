@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import type { StudySession } from '@/lib/types';
 
 interface SessionEditDialogProps {
-  session: StudySession & { course_title?: string };
+  session: StudySession & { course_title: string; course_platform: string | null };
   open: boolean;
   onClose: () => void;
   onSave: (data: {
@@ -58,7 +58,7 @@ export function SessionEditDialog({
           <div className="space-y-1">
             <Label className="text-muted-foreground">Course</Label>
             <p className="text-sm font-medium">
-              {(session as { course_title?: string }).course_title ?? 'Unknown'}
+              {session.course_title}
             </p>
           </div>
           <div className="space-y-1">

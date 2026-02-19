@@ -63,6 +63,7 @@ export function useTimer(): UseTimerReturn {
   );
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef<TimerState>(initialState);
 
   // Keep stateRef in sync
@@ -123,15 +124,16 @@ export function useTimer(): UseTimerReturn {
       if (s.status === 'running' && s.sessionId) {
         const minutes = Math.round(s.elapsedSeconds / 60);
         autoSaveTimerProgress(s.sessionId, minutes).catch(() => {
-          // Retry once after 10s
-          setTimeout(() => {
+          // Retry once after 10s, with cleanup tracking
+          retryTimeoutRef.current = setTimeout(() => {
             const retry = stateRef.current;
             if (retry.status === 'running' && retry.sessionId) {
               autoSaveTimerProgress(
                 retry.sessionId,
                 Math.round(retry.elapsedSeconds / 60)
-              );
+              ).catch(() => { /* exhausted retries */ });
             }
+            retryTimeoutRef.current = null;
           }, 10000);
         });
         saveToStorage(s);
@@ -139,7 +141,7 @@ export function useTimer(): UseTimerReturn {
     }, AUTO_SAVE_INTERVAL);
   }, [saveToStorage]);
 
-  // Cleanup intervals
+  // Cleanup intervals and pending retries
   const clearIntervals = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -148,6 +150,10 @@ export function useTimer(): UseTimerReturn {
     if (autoSaveRef.current) {
       clearInterval(autoSaveRef.current);
       autoSaveRef.current = null;
+    }
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
   }, []);
 
@@ -174,20 +180,33 @@ export function useTimer(): UseTimerReturn {
         // Session still active - show recovery prompt
         setRecoverySession(result.data);
 
+        // Account for the time gap since the browser was closed.
+        // If the timer was running, the gap between lastSavedAt and now is untracked
+        // pause time that must be added to totalPausedMs.
+        const now = Date.now();
+        let adjustedTotalPausedMs = parsed.totalPausedMs;
+        if (parsed.status === 'running') {
+          // Timer was running when browser closed -- treat the gap as paused time
+          const gapMs = now - parsed.lastSavedAt;
+          adjustedTotalPausedMs += gapMs;
+        } else if (parsed.status === 'paused' && parsed.pausedAt) {
+          // Timer was already paused -- pausedAt is still valid, no adjustment needed
+        }
+
         const elapsed = calcElapsed(
           parsed.startedAt,
-          parsed.totalPausedMs,
-          parsed.status === 'paused' ? parsed.pausedAt : null
+          adjustedTotalPausedMs,
+          parsed.status === 'paused' ? parsed.pausedAt : now
         );
 
         const recoveredState: TimerState = {
-          status: parsed.status === 'running' ? 'paused' : 'paused', // Always start paused for recovery
+          status: 'paused', // Always start paused for recovery
           courseId: parsed.courseId,
           sessionId: parsed.sessionId,
           elapsedSeconds: Math.max(0, elapsed),
           startedAt: parsed.startedAt,
-          pausedAt: parsed.pausedAt ?? Date.now(),
-          totalPausedMs: parsed.totalPausedMs,
+          pausedAt: parsed.status === 'paused' ? (parsed.pausedAt ?? now) : now,
+          totalPausedMs: adjustedTotalPausedMs,
         };
 
         setState(recoveredState);

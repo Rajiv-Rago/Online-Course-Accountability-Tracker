@@ -24,9 +24,11 @@ export function TimerCourseSelect({
   const { data, isLoading } = useQuery({
     queryKey: ['courses-for-timer'],
     queryFn: async () => {
-      const result = await getCourses({ status: 'in_progress' });
+      const result = await getCourses();
       if (result.error) throw new Error(result.error);
-      return result.data ?? [];
+      return (result.data ?? []).filter(
+        (c) => c.status === 'in_progress' || c.status === 'not_started'
+      );
     },
     staleTime: 60_000,
   });
@@ -56,7 +58,7 @@ export function TimerCourseSelect({
           ))}
           {courses.length === 0 && !isLoading && (
             <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-              No in-progress courses found
+              No active courses found
             </div>
           )}
         </SelectContent>

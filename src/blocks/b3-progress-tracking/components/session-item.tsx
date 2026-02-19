@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { StudySession } from '@/lib/types';
 
+type SessionWithCourse = StudySession & {
+  course_title: string;
+  course_platform: string | null;
+};
+
 interface SessionItemProps {
-  session: StudySession & {
-    course_title: string;
-    course_platform: string | null;
-  };
-  onEdit: (session: StudySession) => void;
+  session: SessionWithCourse;
+  onEdit: (session: SessionWithCourse) => void;
   onDelete: (sessionId: string) => void;
 }
 
