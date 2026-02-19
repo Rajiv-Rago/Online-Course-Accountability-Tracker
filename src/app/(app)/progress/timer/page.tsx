@@ -1,11 +1,28 @@
-export default function StudyTimerPage() {
+'use client';
+
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { StudyTimer } from '@/blocks/b3-progress-tracking/components/study-timer';
+
+export default function TimerPage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Study Timer</h1>
-      <p className="text-muted-foreground mb-4">Block B3 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Start a timed study session with auto-save.
-      </p>
+    <div className="space-y-6 max-w-xl mx-auto">
+      <Button asChild variant="ghost" size="sm">
+        <Link href="/progress">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Progress
+        </Link>
+      </Button>
+
+      <div>
+        <h1 className="text-2xl font-bold">Timer Mode</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Start a timer to track your study session in real time.
+        </p>
+      </div>
+
+      <StudyTimer />
     </div>
   );
 }

@@ -1,11 +1,22 @@
+'use client';
+
+import { Suspense } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ProgressOverview } from '@/blocks/b3-progress-tracking/components/progress-overview';
+
 export default function ProgressPage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Progress Overview</h1>
-      <p className="text-muted-foreground mb-4">Block B3 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Track your study sessions, streaks, and daily stats.
-      </p>
-    </div>
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-60 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      }
+    >
+      <ProgressOverview />
+    </Suspense>
   );
 }
