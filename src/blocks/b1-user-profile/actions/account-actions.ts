@@ -1,24 +1,15 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { changeEmailSchema, changePasswordSchema } from '../lib/profile-validation';
-
-async function getAuthUserId() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  return { supabase, userId: user.id };
-}
+import { getAuthUser } from './get-auth-user';
 
 export async function changeEmail(formData: {
   newEmail: string;
 }): Promise<{ success: boolean; error?: string }> {
   const parsed = changeEmailSchema.parse(formData);
-  const { supabase } = await getAuthUserId();
+  const { supabase } = await getAuthUser();
 
   const { error } = await supabase.auth.updateUser({
     email: parsed.newEmail,
@@ -34,7 +25,7 @@ export async function changePassword(formData: {
   confirmPassword: string;
 }): Promise<{ success: boolean; error?: string }> {
   const parsed = changePasswordSchema.parse(formData);
-  const { supabase } = await getAuthUserId();
+  const { supabase } = await getAuthUser();
 
   // Supabase JS v2 updateUser does not verify the old password directly.
   // We sign in with the current password first to verify it.
@@ -60,7 +51,7 @@ export async function changePassword(formData: {
 }
 
 export async function exportUserData(): Promise<string> {
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
 
   const [profile, courses, sessions, stats, analyses, reports, notifications, achievements] =
     await Promise.all([
@@ -74,10 +65,17 @@ export async function exportUserData(): Promise<string> {
       supabase.from('achievements').select('*').eq('user_id', userId),
     ]);
 
+  // Redact sensitive webhook credentials from export
+  const profileData = profile.data;
+  if (profileData) {
+    profileData.slack_webhook_url = profileData.slack_webhook_url ? '[REDACTED]' : null;
+    profileData.discord_webhook_url = profileData.discord_webhook_url ? '[REDACTED]' : null;
+  }
+
   return JSON.stringify(
     {
       exported_at: new Date().toISOString(),
-      profile: profile.data,
+      profile: profileData,
       courses: courses.data,
       study_sessions: sessions.data,
       daily_stats: stats.data,
@@ -98,12 +96,15 @@ export async function deleteAccount(formData: {
     return { success: false, error: 'Please type DELETE to confirm' };
   }
 
-  const { userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
   const adminClient = createAdminClient();
 
   const { error } = await adminClient.auth.admin.deleteUser(userId);
 
   if (error) return { success: false, error: error.message };
+
+  // Sign out to invalidate the session cookie
+  await supabase.auth.signOut();
   revalidatePath('/');
   return { success: true };
 }

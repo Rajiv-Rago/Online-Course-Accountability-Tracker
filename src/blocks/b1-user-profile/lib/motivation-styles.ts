@@ -42,5 +42,10 @@ export const MOTIVATION_STYLES: MotivationStyleInfo[] = [
 export function getMotivationStyleInfo(
   value: MotivationStyle
 ): MotivationStyleInfo {
-  return MOTIVATION_STYLES.find((s) => s.value === value) ?? MOTIVATION_STYLES[1];
+  const found = MOTIVATION_STYLES.find((s) => s.value === value);
+  if (!found) {
+    console.warn(`Unknown motivation_style "${value}", falling back to "balanced"`);
+    return MOTIVATION_STYLES[1];
+  }
+  return found;
 }

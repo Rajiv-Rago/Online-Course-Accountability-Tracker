@@ -32,26 +32,34 @@ ALTER TABLE public.user_profiles
   RENAME COLUMN daily_study_goal_minutes TO daily_study_goal_mins;
 
 -- ---------------------------------------------------------------------------
--- 4. Alter renamed columns
+-- 4. Fix data before adding constraints
 -- ---------------------------------------------------------------------------
-ALTER TABLE public.user_profiles
-  ALTER COLUMN display_name SET NOT NULL,
-  ALTER COLUMN display_name SET DEFAULT '';
+-- Backfill NULLs from old nullable full_name before adding NOT NULL
+UPDATE public.user_profiles
+  SET display_name = ''
+  WHERE display_name IS NULL;
 
--- ---------------------------------------------------------------------------
--- 5. Add new CHECK constraint for motivation_style
--- ---------------------------------------------------------------------------
-ALTER TABLE public.user_profiles
-  ADD CONSTRAINT user_profiles_motivation_style_check
-    CHECK (motivation_style IN ('gentle', 'balanced', 'drill_sergeant'));
-
--- Update any existing rows that have old motivation_style values
+-- Fix old motivation_style values before adding new CHECK constraint
 UPDATE public.user_profiles
   SET motivation_style = 'balanced'
   WHERE motivation_style NOT IN ('gentle', 'balanced', 'drill_sergeant');
 
 -- ---------------------------------------------------------------------------
--- 6. Add new columns
+-- 5. Alter renamed columns (safe now that NULLs are gone)
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.user_profiles
+  ALTER COLUMN display_name SET DEFAULT '',
+  ALTER COLUMN display_name SET NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- 6. Add new CHECK constraint for motivation_style (safe now that values are clean)
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.user_profiles
+  ADD CONSTRAINT user_profiles_motivation_style_check
+    CHECK (motivation_style IN ('gentle', 'balanced', 'drill_sergeant'));
+
+-- ---------------------------------------------------------------------------
+-- 7. Add new columns
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS learning_goals        text[]    NOT NULL DEFAULT '{}',
@@ -73,13 +81,13 @@ ALTER TABLE public.user_profiles
   ADD COLUMN IF NOT EXISTS discord_webhook_url   text;
 
 -- ---------------------------------------------------------------------------
--- 7. Add indexes
+-- 8. Add indexes
 -- ---------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_user_profiles_created_at
   ON public.user_profiles (created_at);
 
 -- ---------------------------------------------------------------------------
--- 8. Update handle_new_user() trigger to populate display_name from metadata
+-- 9. Update handle_new_user() trigger to populate display_name from metadata
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$

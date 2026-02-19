@@ -54,10 +54,12 @@ export const onboardingStepSchemas = [
   onboardingStep4Schema,
 ] as const;
 
-export type OnboardingData = z.infer<typeof onboardingStep1Schema> &
-  z.infer<typeof onboardingStep2Schema> &
-  z.infer<typeof onboardingStep3Schema> &
-  z.infer<typeof onboardingStep4Schema>;
+export const completeOnboardingSchema = onboardingStep1Schema
+  .merge(onboardingStep2Schema)
+  .merge(onboardingStep3Schema)
+  .merge(onboardingStep4Schema);
+
+export type OnboardingData = z.infer<typeof completeOnboardingSchema>;
 
 // ---------------------------------------------------------------------------
 // Notification preferences

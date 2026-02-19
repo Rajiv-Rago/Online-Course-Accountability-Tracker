@@ -1,24 +1,19 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import type { UserProfile } from '@/lib/types/shared';
-import { notificationPrefsSchema, type NotificationPrefs } from '../lib/profile-validation';
+import { notificationPrefsSchema, webhookUrlSchema, type NotificationPrefs } from '../lib/profile-validation';
+import { getAuthUser } from './get-auth-user';
 
-async function getAuthUserId() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  return { supabase, userId: user.id };
-}
+const slackUrlSchema = z.string().url().startsWith('https://hooks.slack.com/');
+const discordUrlSchema = z.string().url().startsWith('https://discord.com/api/webhooks/');
 
 export async function updateNotificationPrefs(
   prefs: NotificationPrefs
 ): Promise<UserProfile> {
   const parsed = notificationPrefsSchema.parse(prefs);
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
 
   const { data, error } = await supabase
     .from('user_profiles')
@@ -36,13 +31,14 @@ export async function updateWebhookUrls(urls: {
   slack_webhook_url: string | null;
   discord_webhook_url: string | null;
 }): Promise<UserProfile> {
-  const { supabase, userId } = await getAuthUserId();
+  const parsed = webhookUrlSchema.parse(urls);
+  const { supabase, userId } = await getAuthUser();
 
   const { data, error } = await supabase
     .from('user_profiles')
     .update({
-      slack_webhook_url: urls.slack_webhook_url || null,
-      discord_webhook_url: urls.discord_webhook_url || null,
+      slack_webhook_url: parsed.slack_webhook_url || null,
+      discord_webhook_url: parsed.discord_webhook_url || null,
     })
     .eq('id', userId)
     .select()
@@ -56,6 +52,13 @@ export async function updateWebhookUrls(urls: {
 export async function testSlackWebhook(
   url: string
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate URL to prevent SSRF — only allow Slack webhook URLs
+  try {
+    slackUrlSchema.parse(url);
+  } catch {
+    return { success: false, error: 'Invalid Slack webhook URL' };
+  }
+
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -79,6 +82,13 @@ export async function testSlackWebhook(
 export async function testDiscordWebhook(
   url: string
 ): Promise<{ success: boolean; error?: string }> {
+  // Validate URL to prevent SSRF — only allow Discord webhook URLs
+  try {
+    discordUrlSchema.parse(url);
+  } catch {
+    return { success: false, error: 'Invalid Discord webhook URL' };
+  }
+
   try {
     const res = await fetch(url, {
       method: 'POST',

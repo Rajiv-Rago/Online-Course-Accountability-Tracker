@@ -7,6 +7,7 @@ import {
   onboardingStep2Schema,
   onboardingStep3Schema,
   onboardingStep4Schema,
+  completeOnboardingSchema,
   type OnboardingData,
 } from '../lib/profile-validation';
 import {
@@ -52,12 +53,12 @@ const stepSchemas = [
   null, // step 5 = summary
 ];
 
-export function useOnboarding(initialStep = 1) {
+export function useOnboarding(initialStep = 1, initialDisplayName = '') {
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, {
     step: initialStep,
     data: {
-      display_name: '',
+      display_name: initialDisplayName,
       experience_level: 'beginner',
       learning_goals: [],
       preferred_days: [],
@@ -113,9 +114,19 @@ export function useOnboarding(initialStep = 1) {
   }, [state.step]);
 
   const complete = useCallback(async () => {
+    // Validate all data before submitting
+    const result = completeOnboardingSchema.safeParse(state.data);
+    if (!result.success) {
+      dispatch({
+        type: 'SET_ERROR',
+        error: result.error.errors[0]?.message ?? 'Please complete all steps',
+      });
+      return;
+    }
+
     dispatch({ type: 'SET_COMPLETING', value: true });
     try {
-      await completeOnboarding(state.data as OnboardingData);
+      await completeOnboarding(result.data);
       router.push('/dashboard');
     } catch (e) {
       dispatch({

@@ -31,12 +31,7 @@ export function OnboardingWizard({
     complete,
     isCompleting,
     error,
-  } = useOnboarding(initialStep);
-
-  // Pre-fill display name if available from auth metadata
-  if (initialDisplayName && !data.display_name) {
-    setStepData({ display_name: initialDisplayName });
-  }
+  } = useOnboarding(initialStep, initialDisplayName);
 
   return (
     <div className="w-full max-w-2xl mx-auto">

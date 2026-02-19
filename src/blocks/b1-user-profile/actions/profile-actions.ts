@@ -1,28 +1,16 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { UserProfile } from '@/lib/types/shared';
 import {
   profileSchema,
-  onboardingStep1Schema,
-  onboardingStep2Schema,
-  onboardingStep3Schema,
-  onboardingStep4Schema,
+  completeOnboardingSchema,
 } from '../lib/profile-validation';
 import { z } from 'zod';
-
-async function getAuthUserId() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-  return { supabase, userId: user.id };
-}
+import { getAuthUser } from './get-auth-user';
 
 export async function getProfile(): Promise<UserProfile> {
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
   const { data, error } = await supabase
     .from('user_profiles')
     .select('*')
@@ -37,7 +25,7 @@ export async function updateProfile(
   formData: z.infer<typeof profileSchema>
 ): Promise<UserProfile> {
   const parsed = profileSchema.parse(formData);
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
 
   const { data, error } = await supabase
     .from('user_profiles')
@@ -51,16 +39,11 @@ export async function updateProfile(
   return data as UserProfile;
 }
 
-const completeOnboardingSchema = onboardingStep1Schema
-  .merge(onboardingStep2Schema)
-  .merge(onboardingStep3Schema)
-  .merge(onboardingStep4Schema);
-
 export async function completeOnboarding(
   formData: z.infer<typeof completeOnboardingSchema>
 ): Promise<UserProfile> {
   const parsed = completeOnboardingSchema.parse(formData);
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
 
   const { data, error } = await supabase
     .from('user_profiles')
@@ -79,7 +62,7 @@ export async function completeOnboarding(
 }
 
 export async function updateOnboardingStep(step: number): Promise<void> {
-  const { supabase, userId } = await getAuthUserId();
+  const { supabase, userId } = await getAuthUser();
 
   const { error } = await supabase
     .from('user_profiles')

@@ -26,6 +26,9 @@ export function IntegrationSettings() {
     if (profile) {
       setSlackUrl(profile.slack_webhook_url ?? '');
       setDiscordUrl(profile.discord_webhook_url ?? '');
+      // Reflect saved state: if webhook URL is persisted, show as connected
+      setSlackStatus(profile.slack_webhook_url ? 'success' : 'idle');
+      setDiscordStatus(profile.discord_webhook_url ? 'success' : 'idle');
     }
   }, [profile]);
 

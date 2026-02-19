@@ -46,10 +46,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Onboarding gate: check if authenticated user has completed onboarding
+  // Onboarding gate: single DB query for all authenticated non-API routes
   if (
     user &&
-    !pathname.startsWith('/onboarding') &&
     !pathname.startsWith('/login') &&
     !pathname.startsWith('/signup') &&
     !pathname.startsWith('/api/')
@@ -60,22 +59,15 @@ export async function updateSession(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile && !profile.onboarding_completed) {
+    const isOnboardingRoute = pathname.startsWith('/onboarding');
+
+    if (profile && !profile.onboarding_completed && !isOnboardingRoute) {
       const url = request.nextUrl.clone();
       url.pathname = '/onboarding';
       return NextResponse.redirect(url);
     }
-  }
 
-  // Redirect already-onboarded users away from /onboarding
-  if (user && pathname.startsWith('/onboarding')) {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('onboarding_completed')
-      .eq('id', user.id)
-      .single();
-
-    if (profile?.onboarding_completed) {
+    if (profile?.onboarding_completed && isOnboardingRoute) {
       const url = request.nextUrl.clone();
       url.pathname = '/settings/profile';
       return NextResponse.redirect(url);

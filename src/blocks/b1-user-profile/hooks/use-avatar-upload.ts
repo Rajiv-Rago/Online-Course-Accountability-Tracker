@@ -79,6 +79,21 @@ export function useAvatarUpload(userId: string | undefined) {
     try {
       const supabase = createClient();
 
+      // Get current avatar URL to delete the file from storage
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('avatar_url')
+        .eq('id', userId)
+        .single();
+
+      // Delete old file from storage if it exists in our avatars bucket
+      if (profile?.avatar_url) {
+        const match = profile.avatar_url.match(/avatars\/(.+)$/);
+        if (match) {
+          await supabase.storage.from('avatars').remove([match[1]]);
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('user_profiles')
         .update({ avatar_url: null })
