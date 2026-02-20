@@ -1,11 +1,17 @@
-export default function CourseVisualizationPage() {
+'use client';
+
+import { Suspense } from 'react';
+import { useParams } from 'next/navigation';
+import { CourseVisualizationPage } from '@/blocks/b8-visualization/components/course-visualization-page';
+import { ChartLoadingSkeleton } from '@/blocks/b8-visualization/components/chart-loading-skeleton';
+
+export default function CourseVisualizationRoute() {
+  const params = useParams();
+  const courseId = params.id as string;
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Course Visualization</h1>
-      <p className="text-muted-foreground mb-4">Block B8 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Charts and forecasts for a specific course.
-      </p>
-    </div>
+    <Suspense fallback={<ChartLoadingSkeleton height={400} />}>
+      <CourseVisualizationPage courseId={courseId} />
+    </Suspense>
   );
 }

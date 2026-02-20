@@ -1,11 +1,13 @@
-export default function StudyHeatmapPage() {
+'use client';
+
+import { Suspense } from 'react';
+import { HeatmapFullPage } from '@/blocks/b8-visualization/components/heatmap-full-page';
+import { ChartLoadingSkeleton } from '@/blocks/b8-visualization/components/chart-loading-skeleton';
+
+export default function StudyHeatmapRoute() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Study Heatmap</h1>
-      <p className="text-muted-foreground mb-4">Block B8 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Full-screen GitHub-style study heatmap.
-      </p>
-    </div>
+    <Suspense fallback={<ChartLoadingSkeleton height={400} />}>
+      <HeatmapFullPage />
+    </Suspense>
   );
 }

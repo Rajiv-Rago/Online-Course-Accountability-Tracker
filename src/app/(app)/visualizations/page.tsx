@@ -1,11 +1,13 @@
-export default function VisualizationsPage() {
+'use client';
+
+import { Suspense } from 'react';
+import { VisualizationPage } from '@/blocks/b8-visualization/components/visualization-page';
+import { ChartLoadingSkeleton } from '@/blocks/b8-visualization/components/chart-loading-skeleton';
+
+export default function VisualizationsRoute() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Visualizations</h1>
-      <p className="text-muted-foreground mb-4">Block B8 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Charts, heatmaps, and pattern insights for your study data.
-      </p>
-    </div>
+    <Suspense fallback={<ChartLoadingSkeleton height={400} />}>
+      <VisualizationPage />
+    </Suspense>
   );
 }
