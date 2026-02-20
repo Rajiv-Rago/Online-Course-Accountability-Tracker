@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getUnreadCount } from '../actions/notification-actions';
 
 interface NotificationPayloadRow {
@@ -13,6 +14,7 @@ interface NotificationPayloadRow {
 export function useUnreadCount() {
   const queryClient = useQueryClient();
   const supabase = createClient();
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['unread-count'],
@@ -26,7 +28,10 @@ export function useUnreadCount() {
   });
 
   useEffect(() => {
+    let cancelled = false;
+
     supabase.auth.getUser().then(({ data }) => {
+      if (cancelled) return;
       const userId = data.user?.id ?? null;
       if (!userId) return;
 
@@ -85,13 +90,15 @@ export function useUnreadCount() {
         )
         .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      channelRef.current = channel;
     });
 
     return () => {
-      supabase.removeAllChannels();
+      cancelled = true;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [supabase, queryClient]);
 

@@ -36,6 +36,15 @@ export async function sendEmail(params: {
   }
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildEmailHtml(params: {
   subject: string;
   body: string;
@@ -43,8 +52,10 @@ function buildEmailHtml(params: {
   actionUrl?: string;
 }): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+  const safeSubject = escapeHtml(params.subject);
+  const safeBody = escapeHtml(params.body);
   const ctaHtml = params.actionUrl
-    ? `<p style="margin-top:16px"><a href="${appUrl}${params.actionUrl}" style="background:#f97316;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">View in App</a></p>`
+    ? `<p style="margin-top:16px"><a href="${escapeHtml(appUrl)}${escapeHtml(params.actionUrl)}" style="background:#f97316;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">View in App</a></p>`
     : '';
 
   return `
@@ -53,8 +64,8 @@ function buildEmailHtml(params: {
         <h2 style="margin:0;color:#1a1a1a;">Course Accountability Tracker</h2>
       </div>
       <div style="background:#f9fafb;border-radius:8px;padding:20px;">
-        <h3 style="margin:0 0 8px;color:#1a1a1a;">${params.subject}</h3>
-        <p style="margin:0;color:#4b5563;line-height:1.5;">${params.body}</p>
+        <h3 style="margin:0 0 8px;color:#1a1a1a;">${safeSubject}</h3>
+        <p style="margin:0;color:#4b5563;line-height:1.5;">${safeBody}</p>
         ${ctaHtml}
       </div>
       <p style="margin-top:24px;font-size:12px;color:#9ca3af;text-align:center;">

@@ -28,8 +28,6 @@ interface UserPrefs {
   notify_risk_alert: boolean;
   slack_webhook_url: string | null;
   discord_webhook_url: string | null;
-  preferred_time_start: string | null;
-  preferred_time_end: string | null;
 }
 
 // Default channel preferences per notification type
@@ -53,7 +51,7 @@ export async function sendToChannels(
   const { data: prefs } = await supabase
     .from('user_profiles')
     .select(
-      'email, timezone, notify_email, notify_push, notify_slack, notify_discord, notify_daily_reminder, notify_streak_warning, notify_weekly_report, notify_achievement, notify_risk_alert, slack_webhook_url, discord_webhook_url, preferred_time_start, preferred_time_end'
+      'email, timezone, notify_email, notify_push, notify_slack, notify_discord, notify_daily_reminder, notify_streak_warning, notify_weekly_report, notify_achievement, notify_risk_alert, slack_webhook_url, discord_webhook_url'
     )
     .eq('id', notification.user_id)
     .single();
@@ -91,6 +89,7 @@ export async function sendToChannels(
 
   // Slack
   if (
+    defaultChannels.includes('slack') &&
     userPrefs.notify_slack &&
     userPrefs.slack_webhook_url
   ) {
@@ -110,6 +109,7 @@ export async function sendToChannels(
 
   // Discord
   if (
+    defaultChannels.includes('discord') &&
     userPrefs.notify_discord &&
     userPrefs.discord_webhook_url
   ) {

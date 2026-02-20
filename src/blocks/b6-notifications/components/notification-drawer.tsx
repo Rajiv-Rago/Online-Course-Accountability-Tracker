@@ -24,7 +24,7 @@ export function NotificationDrawer({ isOpen, onClose }: NotificationDrawerProps)
   const { data, isLoading } = useNotifications({ pageSize: 5 });
   const { markAsRead, markAllAsRead } = useNotificationMutations();
 
-  const notifications = data?.pages.flatMap((p) => p.notifications).slice(0, 5) ?? [];
+  const notifications = data?.pages.flatMap((p) => p.notifications) ?? [];
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>

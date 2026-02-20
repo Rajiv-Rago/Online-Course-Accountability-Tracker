@@ -50,6 +50,15 @@ export async function processReminders(): Promise<SchedulerResult> {
     return { processed: 0, sent: 0, skipped: 0, errors: [] };
   }
 
+  // 2. Filter schedules by day-of-week and time window
+  interface EligibleSchedule {
+    schedule: ScheduleJoinRow;
+    userTimezone: string;
+    courseTitle: string;
+    dailyGoal: number;
+  }
+
+  const eligible: EligibleSchedule[] = [];
   for (const raw of schedules) {
     processed++;
 
@@ -59,42 +68,53 @@ export async function processReminders(): Promise<SchedulerResult> {
     const courseTitle = schedule.courses?.title ?? 'your course';
     const dailyGoal = schedule.user_profiles?.daily_study_goal_mins ?? 60;
 
-    // 2. Check if today's day of week (in user's timezone) matches
     const todayDay = getDayOfWeekInTimezone(now, userTimezone as string);
-    const daysOfWeek = schedule.days_of_week;
-    if (!daysOfWeek.includes(todayDay)) {
+    if (!schedule.days_of_week.includes(todayDay)) {
       skipped++;
       continue;
     }
 
-    // 3. Check if schedule time falls within the 15-minute window
     const scheduleTime = normalizeTime(schedule.time);
     if (!isWithinWindow(scheduleTime, now, userTimezone as string, 15)) {
       skipped++;
       continue;
     }
 
-    // 4. Check duplicate prevention - already sent today?
-    const todayStart = getTodayStartUTC(userTimezone as string);
-    const tomorrowStart = new Date(todayStart);
-    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    eligible.push({ schedule, userTimezone: userTimezone as string, courseTitle, dailyGoal });
+  }
 
-    const { data: existing } = await supabase
+  // 3. Batch duplicate check — find which schedules already sent today
+  const alreadySentIds = new Set<string>();
+  if (eligible.length > 0) {
+    // Use the earliest possible "today start" across all timezones to ensure we catch all dupes
+    const todayStarts = eligible.map((e) => getTodayStartUTC(e.userTimezone));
+    const earliestStart = new Date(Math.min(...todayStarts.map((d) => d.getTime())));
+
+    const scheduleIds = eligible.map((e) => e.schedule.id);
+    const { data: existingNotifs } = await supabase
       .from('notifications')
-      .select('id')
-      .eq('user_id', schedule.user_id)
+      .select('metadata')
       .eq('type', 'reminder')
-      .gte('created_at', todayStart.toISOString())
-      .lt('created_at', tomorrowStart.toISOString())
-      .contains('metadata', { reminder_schedule_id: schedule.id })
-      .limit(1);
+      .gte('created_at', earliestStart.toISOString());
 
-    if (existing && existing.length > 0) {
+    if (existingNotifs) {
+      for (const n of existingNotifs) {
+        const meta = n.metadata as { reminder_schedule_id?: string } | null;
+        if (meta?.reminder_schedule_id && scheduleIds.includes(meta.reminder_schedule_id)) {
+          alreadySentIds.add(meta.reminder_schedule_id);
+        }
+      }
+    }
+  }
+
+  // 4. Process eligible schedules
+  for (const { schedule, courseTitle, dailyGoal } of eligible) {
+    if (alreadySentIds.has(schedule.id)) {
       skipped++;
       continue;
     }
 
-    // 5. Create notification
+    // Create notification
     const { data: notification, error: insertErr } = await supabase
       .from('notifications')
       .insert({
@@ -119,7 +139,7 @@ export async function processReminders(): Promise<SchedulerResult> {
       continue;
     }
 
-    // 6. Send via configured channels
+    // Send via configured channels
     try {
       await sendToChannels(notification);
       sent++;
@@ -198,16 +218,45 @@ function normalizeTime(time: string): string {
 
 /**
  * Get start of "today" in a timezone as a UTC Date.
+ * Uses Intl to find the current UTC offset for the timezone,
+ * then subtracts it from local midnight to get the correct UTC instant.
  */
 function getTodayStartUTC(timezone: string): Date {
   try {
-    const nowStr = new Intl.DateTimeFormat('en-CA', {
+    const now = new Date();
+
+    // Get the local date in the user's timezone
+    const localDateStr = new Intl.DateTimeFormat('en-CA', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       timeZone: timezone,
-    }).format(new Date());
-    return new Date(nowStr + 'T00:00:00Z');
+    }).format(now);
+
+    // Get the UTC offset for this timezone by comparing formatted times
+    const utcParts = new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: 'UTC',
+    }).format(now).split(':').map(Number);
+
+    const tzParts = new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit', minute: '2-digit',
+      hour12: false, timeZone: timezone,
+    }).format(now).split(':').map(Number);
+
+    const utcMinutes = utcParts[0] * 60 + utcParts[1];
+    const tzMinutes = tzParts[0] * 60 + tzParts[1];
+    let offsetMinutes = tzMinutes - utcMinutes;
+
+    // Handle day boundary wrap (e.g. UTC=23:00, TZ=01:00 next day → offset=+120 not -1320)
+    if (offsetMinutes > 720) offsetMinutes -= 1440;
+    if (offsetMinutes < -720) offsetMinutes += 1440;
+
+    // Local midnight in UTC = midnight minus the offset
+    const localMidnight = new Date(localDateStr + 'T00:00:00Z');
+    localMidnight.setUTCMinutes(localMidnight.getUTCMinutes() - offsetMinutes);
+
+    return localMidnight;
   } catch {
     const d = new Date();
     d.setUTCHours(0, 0, 0, 0);

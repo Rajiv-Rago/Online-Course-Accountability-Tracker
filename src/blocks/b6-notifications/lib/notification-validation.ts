@@ -28,7 +28,7 @@ export const notificationCreateSchema = z.object({
   type: notificationTypeEnum,
   title: z.string().min(1).max(200),
   message: z.string().min(1).max(2000),
-  actionUrl: z.string().url().optional().or(z.string().startsWith('/')).optional(),
+  actionUrl: z.string().startsWith('/').optional(),
   metadata: z.record(z.unknown()).optional(),
 });
 

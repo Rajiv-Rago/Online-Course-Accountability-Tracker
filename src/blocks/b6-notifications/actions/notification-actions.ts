@@ -4,18 +4,9 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { Notification } from '@/lib/types';
 import type { ActionResult } from '@/lib/types/shared';
+import { getAuthUserId } from '@/lib/get-auth-user-id';
 import { sendToChannels } from '../lib/notification-sender';
 import type { NotificationTypeValue } from '../lib/notification-validation';
-
-async function getAuthUserId(): Promise<string> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Unauthorized');
-  return user.id;
-}
 
 // ---------------------------------------------------------------------------
 // GET NOTIFICATIONS (paginated + filtered)
@@ -51,17 +42,20 @@ export async function getNotifications(options: {
     }
 
     if (options.cursor) {
-      query = query.lt('created_at', options.cursor);
+      const [cursorTime, cursorId] = options.cursor.split('|');
+      query = query.or(`created_at.lt.${cursorTime},and(created_at.eq.${cursorTime},id.lt.${cursorId})`);
     }
 
     const { data, error } = await query;
     if (error) return { error: error.message };
 
     const notifications = (data ?? []) as Notification[];
-    const nextCursor =
-      notifications.length === limit
-        ? notifications[notifications.length - 1].created_at
-        : null;
+    const lastItem = notifications.length === limit
+      ? notifications[notifications.length - 1]
+      : null;
+    const nextCursor = lastItem
+      ? `${lastItem.created_at}|${lastItem.id}`
+      : null;
 
     return { data: { notifications, nextCursor } };
   } catch (e) {

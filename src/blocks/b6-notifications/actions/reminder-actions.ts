@@ -4,22 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { ReminderSchedule } from '@/lib/types';
 import type { ActionResult } from '@/lib/types/shared';
+import { getAuthUserId } from '@/lib/get-auth-user-id';
 import {
   reminderCreateSchema,
   reminderUpdateSchema,
   type ReminderCreateInput,
   type ReminderUpdateInput,
 } from '../lib/notification-validation';
-
-async function getAuthUserId(): Promise<string> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) throw new Error('Unauthorized');
-  return user.id;
-}
 
 // Reminder with joined course title
 export type ReminderWithCourse = ReminderSchedule & {

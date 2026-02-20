@@ -22,7 +22,9 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   reminderCreateSchema,
+  reminderUpdateSchema,
   type ReminderCreateInput,
+  type ReminderUpdateInput,
 } from '../lib/notification-validation';
 import type { ReminderWithCourse } from '../actions/reminder-actions';
 
@@ -63,8 +65,10 @@ export function ReminderForm({
   onSubmit,
   isPending,
 }: ReminderFormProps) {
+  const createResolver = zodResolver(reminderCreateSchema);
+  const updateResolver = zodResolver(reminderUpdateSchema);
   const form = useForm<ReminderCreateInput>({
-    resolver: zodResolver(reminderCreateSchema),
+    resolver: (mode === 'edit' ? updateResolver : createResolver) as typeof createResolver,
     defaultValues: {
       courseId: initialData?.course_id ?? '',
       daysOfWeek: initialData?.days_of_week ?? ['mon', 'wed', 'fri'],
