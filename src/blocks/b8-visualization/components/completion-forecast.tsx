@@ -98,7 +98,7 @@ export function CompletionForecastChart({ forecast, targetDate }: CompletionFore
             type="monotone"
             dataKey="ci90Lower"
             stroke="none"
-            fill="#ffffff"
+            fill={theme.background}
             fillOpacity={1}
           />
 
@@ -114,7 +114,7 @@ export function CompletionForecastChart({ forecast, targetDate }: CompletionFore
             type="monotone"
             dataKey="ci70Lower"
             stroke="none"
-            fill="#ffffff"
+            fill={theme.background}
             fillOpacity={1}
           />
 

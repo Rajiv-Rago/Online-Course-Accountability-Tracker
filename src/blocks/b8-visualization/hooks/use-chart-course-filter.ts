@@ -50,14 +50,14 @@ export function useChartCourseFilter(): CourseFilterState {
   const setSelectedCourseIds = useCallback(
     (ids: string[]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (ids.length === 0 || ids.length === courses.length) {
+      if (ids.length === 0 || (courseOptions.length > 0 && ids.length === courseOptions.length)) {
         params.delete('courses');
       } else {
         params.set('courses', ids.join(','));
       }
       router.push(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [searchParams, router, pathname, courses.length],
+    [searchParams, router, pathname, courseOptions.length],
   );
 
   return { selectedCourseIds, setSelectedCourseIds, courses, isAllSelected, isLoading };

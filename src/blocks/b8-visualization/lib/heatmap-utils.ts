@@ -100,7 +100,11 @@ export function calculateHeatmapSummary(
   // Month aggregation
   const monthTotals = new Map<string, number>();
 
-  const sortedCells = [...cells].sort((a, b) => a.date.localeCompare(b.date));
+  // Filter out future dates to avoid breaking streak with zero-minute future days
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const sortedCells = [...cells]
+    .filter((c) => c.date <= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   for (const cell of sortedCells) {
     totalMinutes += cell.minutes;

@@ -36,7 +36,7 @@ export function getDateRange(preset: RangePreset): DateRange {
     case '1y':
       return { startDate: subYears(now, 1).toISOString(), endDate };
     case 'all':
-      return { startDate: new Date('2020-01-01').toISOString(), endDate };
+      return { startDate: new Date('2000-01-01').toISOString(), endDate };
   }
 }
 

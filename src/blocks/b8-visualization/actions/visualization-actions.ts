@@ -9,6 +9,7 @@ export interface ProgressTimelineRow {
   course_id: string;
   started_at: string;
   duration_minutes: number;
+  modules_completed: number;
 }
 
 export interface RiskTrendRow {
@@ -87,7 +88,7 @@ export async function getProgressTimeline(input: {
 
     let sessionsQuery = supabase
       .from('study_sessions')
-      .select('course_id, started_at, duration_minutes')
+      .select('course_id, started_at, duration_minutes, modules_completed')
       .gte('started_at', input.startDate)
       .lte('started_at', input.endDate)
       .order('started_at', { ascending: true });
@@ -137,7 +138,7 @@ export async function getStudyHoursData(input: {
 
     let sessionsQuery = supabase
       .from('study_sessions')
-      .select('*')
+      .select('id, course_id, started_at, duration_minutes, modules_completed, session_type, notes, created_at')
       .gte('started_at', input.startDate)
       .lte('started_at', input.endDate)
       .order('started_at', { ascending: true });
@@ -269,14 +270,18 @@ export async function getSessionDistribution(input: {
 
 export async function getSessionsForDay(input: {
   date: string;
+  tzOffsetMinutes?: number;
 }): Promise<ActionResult<DaySessionRow[]>> {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: 'Unauthorized' };
 
-    const startOfDay = `${input.date}T00:00:00.000Z`;
-    const endOfDay = `${input.date}T23:59:59.999Z`;
+    const offset = input.tzOffsetMinutes ?? 0;
+    const baseStart = new Date(`${input.date}T00:00:00Z`);
+    const startOfDay = new Date(baseStart.getTime() + offset * 60 * 1000).toISOString();
+    const baseEnd = new Date(`${input.date}T23:59:59.999Z`);
+    const endOfDay = new Date(baseEnd.getTime() + offset * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
       .from('study_sessions')
@@ -296,6 +301,36 @@ export async function getSessionsForDay(input: {
         duration_minutes: row.duration_minutes as number,
       })),
     };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function getPatternSessionData(input: {
+  courseIds: string[];
+  startDate: string;
+  endDate: string;
+}): Promise<ActionResult<StudySession[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { error: 'Unauthorized' };
+
+    let query = supabase
+      .from('study_sessions')
+      .select('id, course_id, started_at, duration_minutes, modules_completed, session_type, notes, created_at')
+      .gte('started_at', input.startDate)
+      .lte('started_at', input.endDate)
+      .order('started_at', { ascending: true });
+
+    if (input.courseIds.length > 0) {
+      query = query.in('course_id', input.courseIds);
+    }
+
+    const { data, error } = await query;
+    if (error) return { error: error.message };
+
+    return { data: (data ?? []) as StudySession[] };
   } catch (e) {
     return { error: (e as Error).message };
   }

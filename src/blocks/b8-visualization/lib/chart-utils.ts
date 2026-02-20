@@ -73,7 +73,7 @@ const DURATION_BUCKETS = [
   { bucket: '46-60m', min: 46, max: 60 },
   { bucket: '61-90m', min: 61, max: 90 },
   { bucket: '91-120m', min: 91, max: 120 },
-  { bucket: '120m+', min: 121, max: Infinity },
+  { bucket: '120m+', min: 120, max: Infinity },
 ];
 
 export function bucketSessionDurations(

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getStudyHoursData } from '../actions/visualization-actions';
+import { getPatternSessionData } from '../actions/visualization-actions';
 import { detectPatterns, type PatternInsight } from '../lib/pattern-detector';
 import type { DateRange } from '../lib/date-utils';
 
@@ -14,14 +14,14 @@ export function usePatternInsights(courseIds: string[], dateRange: DateRange) {
   return useQuery({
     queryKey: ['viz', 'patterns', dateRange.startDate, dateRange.endDate, courseIds],
     queryFn: async (): Promise<PatternInsightsData> => {
-      const result = await getStudyHoursData({
+      const result = await getPatternSessionData({
         courseIds,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
       if (result.error) throw new Error(result.error);
 
-      const sessions = result.data!.sessions;
+      const sessions = result.data!;
       const dates = new Set(sessions.map((s) => s.started_at.split('T')[0]));
       const hasSufficientData = dates.size >= 14 && sessions.length >= 10;
 

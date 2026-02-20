@@ -2,7 +2,7 @@
 
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import { exportChartAsPng } from '../lib/export-utils';
 
 interface ExportChartButtonProps {

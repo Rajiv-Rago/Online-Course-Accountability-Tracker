@@ -125,8 +125,7 @@ export function calculateForecast(input: ForecastInput): ForecastResult {
     };
   }
 
-  // Calculate remaining hours and days to completion
-  const remainingHours = totalCourseHours - completedHours;
+  // Calculate days to completion
   const lastPoint = dailyCumulativeHours[dailyCumulativeHours.length - 1];
   const lastDayIndex = differenceInDays(parseISO(lastPoint.date), baseDate);
   const lastPredicted = slope * lastDayIndex + intercept;

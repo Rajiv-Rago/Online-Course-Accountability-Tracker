@@ -29,7 +29,8 @@ function detectBestStudyDay(sessions: StudySession[]): PatternInsight | null {
 
   const dayAvgs = dayMinutes.map((m, i) => (dayCounts[i] > 0 ? m / dayCounts[i] : 0));
   const maxAvg = Math.max(...dayAvgs);
-  const overallAvg = dayAvgs.reduce((a, b) => a + b, 0) / 7;
+  const activeDayCount = dayAvgs.filter((a) => a > 0).length;
+  const overallAvg = activeDayCount > 0 ? dayAvgs.reduce((a, b) => a + b, 0) / activeDayCount : 0;
   if (maxAvg === 0 || overallAvg === 0) return null;
 
   const bestDay = dayAvgs.indexOf(maxAvg);
@@ -52,14 +53,14 @@ function detectBestStudyDay(sessions: StudySession[]): PatternInsight | null {
 }
 
 function detectBestStudyTime(sessions: StudySession[]): PatternInsight | null {
-  // Bucket into 2-hour windows
-  const bucketLabels = ['6-8AM', '8-10AM', '10-12PM', '12-2PM', '2-4PM', '4-6PM', '6-8PM', '8-10PM', '10-12AM'];
-  const bucketMinutes = new Array(9).fill(0);
-  const bucketCounts = new Array(9).fill(0);
+  // Bucket into 2-hour windows (including midnight-6AM)
+  const bucketLabels = ['12-6AM', '6-8AM', '8-10AM', '10-12PM', '12-2PM', '2-4PM', '4-6PM', '6-8PM', '8-10PM', '10-12AM'];
+  const bucketMinutes = new Array(10).fill(0);
+  const bucketCounts = new Array(10).fill(0);
 
   for (const s of sessions) {
     const hour = getHours(parseISO(s.started_at));
-    const idx = Math.max(0, Math.min(8, Math.floor((hour - 6) / 2)));
+    const idx = hour < 6 ? 0 : 1 + Math.min(8, Math.floor((hour - 6) / 2));
     bucketMinutes[idx] += s.duration_minutes;
     bucketCounts[idx]++;
   }

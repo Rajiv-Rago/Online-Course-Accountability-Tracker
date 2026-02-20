@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 import { useChartRange } from '../hooks/use-chart-range';
 import { useProgressTimeline } from '../hooks/use-progress-timeline';
 import { useCompletionForecast } from '../hooks/use-completion-forecast';
 import { useRiskTrend } from '../hooks/use-risk-trend';
 import { useSessionDistribution } from '../hooks/use-session-distribution';
-import { useChartCourseFilter } from '../hooks/use-chart-course-filter';
+import { getCourseColor } from '../lib/chart-colors';
 
 import { ChartRangeSelector } from './chart-range-selector';
 import { ChartWrapper } from './chart-wrapper';
@@ -46,7 +45,6 @@ interface CourseVisualizationPageProps {
 export function CourseVisualizationPage({ courseId }: CourseVisualizationPageProps) {
   const router = useRouter();
   const { dateRange } = useChartRange();
-  const { courses } = useChartCourseFilter();
 
   const courseIds = [courseId];
   const progress = useProgressTimeline(courseIds, dateRange);
@@ -54,7 +52,7 @@ export function CourseVisualizationPage({ courseId }: CourseVisualizationPagePro
   const riskTrend = useRiskTrend(courseIds, dateRange);
   const distribution = useSessionDistribution(courseIds, dateRange);
 
-  const courseInfo = courses.find((c) => c.id === courseId);
+  const courseInfo = progress.data?.courses.find((c) => c.id === courseId);
   const courseTitle = courseInfo?.title ?? forecast.courseTitle ?? 'Course';
 
   const progressCoursesWithTargets = progress.chartData.courses.map((c) => {
@@ -118,7 +116,7 @@ export function CourseVisualizationPage({ courseId }: CourseVisualizationPagePro
           <RiskTrendChart
             data={riskTrend.chartData.points}
             courseColors={riskTrend.chartData.courseColors}
-            courses={courses.filter((c) => c.id === courseId)}
+            courses={courseInfo ? [{ id: courseInfo.id, title: courseInfo.title, color: getCourseColor(0) }] : []}
           />
         </ChartWrapper>
 

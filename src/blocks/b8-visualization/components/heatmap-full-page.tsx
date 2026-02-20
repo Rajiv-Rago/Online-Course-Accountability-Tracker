@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useHeatmapData } from '../hooks/use-heatmap-data';
 import { getSessionsForDay } from '../actions/visualization-actions';
 import { StudyHeatmap } from './study-heatmap';
@@ -40,7 +39,14 @@ export function HeatmapFullPage() {
 
   const handleDayClick = async (cell: HeatmapCell) => {
     setSelectedDay({ cell, sessions: [], loading: true });
-    const result = await getSessionsForDay({ date: cell.date });
+    const result = await getSessionsForDay({
+      date: cell.date,
+      tzOffsetMinutes: new Date().getTimezoneOffset(),
+    });
+    if (result.error) {
+      setSelectedDay({ cell, sessions: [], loading: false });
+      return;
+    }
     setSelectedDay({
       cell,
       sessions: result.data ?? [],

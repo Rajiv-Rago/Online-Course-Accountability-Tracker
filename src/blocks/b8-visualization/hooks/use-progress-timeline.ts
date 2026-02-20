@@ -32,29 +32,31 @@ export function useProgressTimeline(courseIds: string[], dateRange: DateRange) {
 
     const { sessions, courses } = query.data;
 
-    // Build cumulative hours per course per day
-    const courseMap = new Map(courses.map((c, i) => [c.id, { ...c, color: getCourseColor(i) }]));
-    const cumulativeByDate = new Map<string, Record<string, number>>();
+    // Build cumulative hours and modules per course per day
+    const cumulativeByDate = new Map<string, { hours: Record<string, number>; modules: Record<string, number> }>();
 
     // Track running totals
     const runningHours: Record<string, number> = {};
+    const runningModules: Record<string, number> = {};
     for (const c of courses) {
       runningHours[c.id] = 0;
+      runningModules[c.id] = 0;
     }
 
     for (const session of sessions) {
       const dateStr = format(parseISO(session.started_at), 'yyyy-MM-dd');
       runningHours[session.course_id] =
         (runningHours[session.course_id] || 0) + session.duration_minutes / 60;
+      if (session.modules_completed) {
+        runningModules[session.course_id] =
+          (runningModules[session.course_id] || 0) + session.modules_completed;
+      }
 
-      if (!cumulativeByDate.has(dateStr)) {
-        cumulativeByDate.set(dateStr, {});
-      }
       // Snapshot all running totals for this date
-      const snapshot = cumulativeByDate.get(dateStr)!;
-      for (const cId of Object.keys(runningHours)) {
-        snapshot[cId] = runningHours[cId];
-      }
+      cumulativeByDate.set(dateStr, {
+        hours: { ...runningHours },
+        modules: { ...runningModules },
+      });
     }
 
     // Convert to progress percent
@@ -64,13 +66,14 @@ export function useProgressTimeline(courseIds: string[], dateRange: DateRange) {
     )) {
       const point: ProgressDataPoint = { date: dateStr };
       for (const course of courses) {
-        const hours = snapshot[course.id] || 0;
+        const hours = snapshot.hours[course.id] || 0;
         if (course.total_hours && course.total_hours > 0) {
           point[course.id] = Math.min(100, Math.round((hours / course.total_hours) * 100));
         } else if (course.total_modules && course.total_modules > 0) {
+          const modules = snapshot.modules[course.id] || 0;
           point[course.id] = Math.min(
             100,
-            Math.round((course.completed_modules / course.total_modules) * 100),
+            Math.round((modules / course.total_modules) * 100),
           );
         } else {
           point[course.id] = 0;
