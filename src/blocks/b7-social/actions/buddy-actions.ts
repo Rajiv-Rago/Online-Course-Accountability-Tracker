@@ -116,7 +116,7 @@ export async function searchUsers(query: string): Promise<ActionResult<SearchRes
 
     const { data: users, error: searchError } = await admin
       .from('user_profiles')
-      .select('id, display_name, avatar_url, email')
+      .select('id, display_name, avatar_url')
       .or(`display_name.ilike.${searchTerm},email.ilike.${searchTerm}`)
       .neq('id', user.id)
       .eq('onboarding_completed', true)

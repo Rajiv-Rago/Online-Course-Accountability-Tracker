@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Achievement, ActionResult, AchievementType, LockedAchievement } from '@/lib/types';
-import { ACHIEVEMENT_DEFINITIONS, ACHIEVEMENT_MAP } from '../lib/achievement-definitions';
+import { ACHIEVEMENT_DEFINITIONS } from '../lib/achievement-definitions';
 import { getDefinitionsForTrigger } from '../lib/achievement-definitions';
 import {
   checkFirstSession,
