@@ -6,6 +6,7 @@ import {
   distributeDailyGoal,
   calcProgress,
   getTodayDayOfWeek,
+  getTodayDateStr,
   type TodaysPlanData,
   type PlanCourseItemData,
 } from '../lib/dashboard-utils';
@@ -14,14 +15,15 @@ export function useTodaysPlan(
   courses: Course[],
   analyses: AiAnalysis[],
   dailyGoalMins: number,
-  preferredDays: DayOfWeek[]
+  preferredDays: DayOfWeek[],
+  timezone?: string
 ): TodaysPlanData {
   return useMemo(() => {
-    const today = getTodayDayOfWeek();
+    const today = getTodayDayOfWeek(timezone);
     const isStudyDay = preferredDays.length === 0 || preferredDays.includes(today);
 
-    // Look for today's daily analysis with interventions
-    const todayStr = new Date().toISOString().split('T')[0];
+    // Look for today's daily analysis with interventions (timezone-aware)
+    const todayStr = getTodayDateStr(timezone);
     const todayAnalysis = analyses.find(
       (a) =>
         a.analysis_type === 'daily' &&
@@ -46,7 +48,7 @@ export function useTodaysPlan(
                 courseId: course.id,
                 title: course.title,
                 priority: course.priority,
-                suggestedMinutes: 30, // AI-based default
+                suggestedMinutes: 30,
                 currentProgress: calcProgress(
                   course.completed_modules,
                   course.total_modules ?? undefined,
@@ -72,5 +74,5 @@ export function useTodaysPlan(
     // Fallback: distribute daily goal across courses by priority
     const planItems = distributeDailyGoal(courses, dailyGoalMins);
     return { planItems, aiMessage: null, isAiGenerated: false, isStudyDay };
-  }, [courses, analyses, dailyGoalMins, preferredDays]);
+  }, [courses, analyses, dailyGoalMins, preferredDays, timezone]);
 }

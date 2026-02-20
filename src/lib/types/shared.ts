@@ -382,3 +382,13 @@ export interface DistributionBucket {
   range: string;                                // e.g. "0-15", "15-30", "morning"
   count: number;
 }
+
+// =============================================================================
+// Server Action Utilities
+// =============================================================================
+
+/** Standard result wrapper for server actions across all blocks */
+export interface ActionResult<T = void> {
+  data?: T;
+  error?: string;
+}

@@ -31,7 +31,7 @@ export function StatCard({
   const TrendIcon = trendInfo?.icon;
 
   return (
-    <Card className={cn('', className)} aria-label={`${label}: ${value}`}>
+    <Card className={cn('', className)}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -13,10 +13,11 @@ import {
 
 export function useSummaryStats(
   dailyStats: DailyStat[],
-  courses: Course[]
+  courses: Course[],
+  timezone?: string
 ): SummaryStatsData {
   return useMemo(() => {
-    const streak = calculateStreak(dailyStats);
+    const streak = calculateStreak(dailyStats, timezone);
     const hoursThisWeek = calculateWeeklyHours(dailyStats);
     const hoursPrevWeek = calculatePreviousWeekHours(dailyStats);
     const activeCourseCount = courses.filter(
@@ -32,5 +33,5 @@ export function useSummaryStats(
       activeCourseCount,
       overallProgress,
     };
-  }, [dailyStats, courses]);
+  }, [dailyStats, courses, timezone]);
 }

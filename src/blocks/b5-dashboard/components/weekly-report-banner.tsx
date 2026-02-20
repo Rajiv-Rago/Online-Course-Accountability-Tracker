@@ -31,13 +31,19 @@ export function WeeklyReportBanner({ report }: WeeklyReportBannerProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" />
             <CardTitle className="text-base">Weekly Report</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? 'Collapse weekly report' : 'Expand weekly report'}
+          >
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -74,9 +80,9 @@ export function WeeklyReportBanner({ report }: WeeklyReportBannerProps) {
             {report.compared_to_previous && (
               <div className="text-xs text-muted-foreground">
                 {report.compared_to_previous.trend === 'up'
-                  ? `+${report.compared_to_previous.minutes_diff}m vs previous week`
+                  ? `+${Math.abs(report.compared_to_previous.minutes_diff)}m vs previous week`
                   : report.compared_to_previous.trend === 'down'
-                    ? `${report.compared_to_previous.minutes_diff}m vs previous week`
+                    ? `-${Math.abs(report.compared_to_previous.minutes_diff)}m vs previous week`
                     : 'Same as previous week'}
               </div>
             )}

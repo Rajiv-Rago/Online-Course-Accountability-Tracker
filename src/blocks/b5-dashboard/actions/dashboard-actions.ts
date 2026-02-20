@@ -12,14 +12,11 @@ import type {
   Notification,
   Achievement,
   StudyBuddy,
+  ActionResult,
 } from '@/lib/types';
 
-interface ActionResult<T = void> {
-  data?: T;
-  error?: string;
-}
-
 export interface DashboardRawData {
+  userId: string;
   profile: Pick<UserProfile, 'display_name' | 'avatar_url' | 'timezone' | 'daily_study_goal_mins' | 'preferred_days'>;
   courses: Course[];
   sessions: StudySession[];
@@ -101,9 +98,12 @@ export async function getDashboardData(): Promise<ActionResult<DashboardRawData>
     ]);
 
     if (profileResult.error) return { error: profileResult.error.message };
+    if (coursesResult.error) return { error: coursesResult.error.message };
+    if (dailyStatsResult.error) return { error: dailyStatsResult.error.message };
 
     return {
       data: {
+        userId: user.id,
         profile: profileResult.data,
         courses: (coursesResult.data ?? []) as Course[],
         sessions: (sessionsResult.data ?? []) as StudySession[],
@@ -133,45 +133,93 @@ export async function getBuddyActivity(
   if (buddyIds.length === 0) return { data: [] };
 
   try {
+    // Auth check: verify caller is authenticated
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return { error: 'Unauthorized' };
+
+    // Authorization: verify each buddyId is an accepted buddy of the caller
+    const { data: validBuddies } = await supabase
+      .from('study_buddies')
+      .select('requester_id, recipient_id')
+      .eq('status', 'accepted')
+      .or(`requester_id.eq.${user.id},recipient_id.eq.${user.id}`);
+
+    const authorizedBuddyIds = new Set<string>();
+    for (const b of validBuddies ?? []) {
+      const otherId = b.requester_id === user.id ? b.recipient_id : b.requester_id;
+      if (buddyIds.includes(otherId)) {
+        authorizedBuddyIds.add(otherId);
+      }
+    }
+
+    const verifiedIds = Array.from(authorizedBuddyIds);
+    if (verifiedIds.length === 0) return { data: [] };
+
+    // Batch queries using admin client (bypasses RLS for cross-user reads)
     const admin = createAdminClient();
+
+    // Batch 1: fetch all profiles and all recent sessions in parallel
+    const [profilesResult, sessionsResult] = await Promise.all([
+      admin
+        .from('user_profiles')
+        .select('id, display_name, avatar_url')
+        .in('id', verifiedIds),
+      admin
+        .from('study_sessions')
+        .select('user_id, started_at, course_id')
+        .in('user_id', verifiedIds)
+        .order('started_at', { ascending: false }),
+    ]);
+
+    const profileMap = new Map(
+      (profilesResult.data ?? []).map((p: { id: string; display_name: string; avatar_url: string | null }) => [p.id, p])
+    );
+
+    // Get the most recent session per buddy
+    const latestSessionMap = new Map<string, { started_at: string; course_id: string }>();
+    for (const session of sessionsResult.data ?? []) {
+      if (!latestSessionMap.has(session.user_id)) {
+        latestSessionMap.set(session.user_id, session);
+      }
+    }
+
+    // Batch 2: fetch all course titles in one query
+    const courseIds = new Set<string>();
+    latestSessionMap.forEach((session) => {
+      courseIds.add(session.course_id);
+    });
+
+    const courseMap = new Map<string, string>();
+    if (courseIds.size > 0) {
+      const coursesResult = await admin
+        .from('courses')
+        .select('id, title')
+        .in('id', Array.from(courseIds));
+      for (const c of coursesResult.data ?? []) {
+        courseMap.set(c.id, c.title);
+      }
+    }
+
+    // Assemble results
     const results: BuddyActivityData[] = [];
+    for (const buddyId of verifiedIds) {
+      const profile = profileMap.get(buddyId);
+      if (!profile) continue;
 
-    for (const buddyId of buddyIds) {
-      const [profileResult, sessionResult] = await Promise.all([
-        admin
-          .from('user_profiles')
-          .select('display_name, avatar_url')
-          .eq('id', buddyId)
-          .single(),
-        admin
-          .from('study_sessions')
-          .select('started_at, course_id')
-          .eq('user_id', buddyId)
-          .order('started_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
-
-      if (profileResult.error) continue;
-
+      const latestSession = latestSessionMap.get(buddyId);
       let recentSession: BuddyActivityData['recentSession'] = null;
-      if (sessionResult.data) {
-        const courseResult = await admin
-          .from('courses')
-          .select('title')
-          .eq('id', sessionResult.data.course_id)
-          .single();
-
+      if (latestSession) {
         recentSession = {
-          courseTitle: courseResult.data?.title ?? 'Unknown Course',
-          startedAt: sessionResult.data.started_at,
+          courseTitle: courseMap.get(latestSession.course_id) ?? 'Unknown Course',
+          startedAt: latestSession.started_at,
         };
       }
 
       results.push({
         buddyId,
-        buddyName: profileResult.data.display_name || 'Study Buddy',
-        buddyAvatar: profileResult.data.avatar_url,
+        buddyName: profile.display_name || 'Study Buddy',
+        buddyAvatar: profile.avatar_url,
         recentSession,
       });
     }

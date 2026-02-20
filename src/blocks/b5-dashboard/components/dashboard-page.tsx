@@ -1,9 +1,19 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+import type {
+  Course,
+  StudySession,
+  DailyStat,
+  AiAnalysis,
+  Achievement,
+  WeeklyReport,
+  Notification,
+  DayOfWeek,
+} from '@/lib/types';
 import { useDashboardData } from '../hooks/use-dashboard-data';
 import { useSummaryStats } from '../hooks/use-summary-stats';
 import { useTodaysPlan } from '../hooks/use-todays-plan';
@@ -23,7 +33,6 @@ import { RecentActivityFeed } from './recent-activity-feed';
 import { NotificationPreview } from './notification-preview';
 import { BuddyActivitySidebar } from './buddy-activity-sidebar';
 import { EmptyState } from './empty-state';
-import type { DayOfWeek } from '@/lib/types';
 
 export function DashboardPage() {
   const { data, isLoading, error } = useDashboardData();
@@ -72,7 +81,7 @@ export function DashboardPage() {
 
   if (!data) return null;
 
-  const { profile, courses, sessions, dailyStats, analyses, weeklyReport, notifications, buddyActivity } = data;
+  const { profile, courses, sessions, dailyStats, analyses, weeklyReport, notifications, achievements, buddyActivity } = data;
 
   if (courses.length === 0) {
     return <EmptyState displayName={profile.display_name} />;
@@ -85,11 +94,24 @@ export function DashboardPage() {
       sessions={sessions}
       dailyStats={dailyStats}
       analyses={analyses}
+      achievements={achievements}
       weeklyReport={weeklyReport}
       notifications={notifications}
       buddyActivity={buddyActivity}
     />
   );
+}
+
+interface DashboardContentProps {
+  profile: { display_name: string; avatar_url: string | null; timezone: string; daily_study_goal_mins: number; preferred_days: DayOfWeek[] };
+  courses: Course[];
+  sessions: StudySession[];
+  dailyStats: DailyStat[];
+  analyses: AiAnalysis[];
+  achievements: Achievement[];
+  weeklyReport: WeeklyReport | null;
+  notifications: Notification[];
+  buddyActivity: BuddyActivityItem[];
 }
 
 function DashboardContent({
@@ -98,29 +120,23 @@ function DashboardContent({
   sessions,
   dailyStats,
   analyses,
+  achievements,
   weeklyReport,
   notifications,
   buddyActivity,
-}: {
-  profile: { display_name: string; avatar_url: string | null; timezone: string; daily_study_goal_mins: number; preferred_days: DayOfWeek[] };
-  courses: import('@/lib/types').Course[];
-  sessions: import('@/lib/types').StudySession[];
-  dailyStats: import('@/lib/types').DailyStat[];
-  analyses: import('@/lib/types').AiAnalysis[];
-  weeklyReport: import('@/lib/types').WeeklyReport | null;
-  notifications: import('@/lib/types').Notification[];
-  buddyActivity: BuddyActivityItem[];
-}) {
-  const stats = useSummaryStats(dailyStats, courses);
-  const plan = useTodaysPlan(courses, analyses, profile.daily_study_goal_mins, profile.preferred_days);
-  const activityItems = useRecentActivity(sessions, [], courses, analyses);
+}: DashboardContentProps) {
+  const stats = useSummaryStats(dailyStats, courses, profile.timezone);
+  const plan = useTodaysPlan(courses, analyses, profile.daily_study_goal_mins, profile.preferred_days, profile.timezone);
+  const activityItems = useRecentActivity(sessions, achievements, courses, analyses);
 
-  const dashboardCourses = courses.map((c) =>
-    mapCourseToDashboardData(c, sessions, analyses)
+  const dashboardCourses = useMemo(
+    () => courses.map((c) => mapCourseToDashboardData(c, sessions, analyses)),
+    [courses, sessions, analyses]
   );
 
   const greeting = getGreeting(profile.timezone);
   const displayName = profile.display_name || undefined;
+  const formattedDate = useMemo(() => format(new Date(), 'EEEE, MMMM d, yyyy'), []);
 
   return (
     <div className="space-y-6">
@@ -132,7 +148,7 @@ function DashboardContent({
             {displayName ? `, ${displayName}` : ''}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            {formattedDate}
           </p>
         </div>
         <div className="flex items-center gap-2">

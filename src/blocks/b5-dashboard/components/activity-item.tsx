@@ -3,20 +3,20 @@
 import Link from 'next/link';
 import { Clock, Trophy, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ActivityItemData } from '../lib/dashboard-utils';
+import type { ActivityItemData, ActivityIcon } from '../lib/dashboard-utils';
 
-const iconMap = {
+const iconMap: Record<ActivityIcon, typeof Clock> = {
   Clock,
   Trophy,
   AlertTriangle,
-} as const;
+};
 
 interface ActivityItemProps {
   item: ActivityItemData;
 }
 
 export function ActivityItem({ item }: ActivityItemProps) {
-  const Icon = iconMap[item.icon as keyof typeof iconMap] ?? Clock;
+  const Icon = iconMap[item.icon];
 
   const content = (
     <div className="flex items-start gap-3 py-2">

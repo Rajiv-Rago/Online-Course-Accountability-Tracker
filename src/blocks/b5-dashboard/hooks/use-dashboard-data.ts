@@ -20,19 +20,22 @@ export function useDashboardData() {
       if (result.error) throw new Error(result.error);
       const raw = result.data!;
 
-      // Extract buddy IDs for current user
-      const buddyIds = new Set<string>();
+      // Extract buddy IDs, filtering out the current user
+      const buddyIds: string[] = [];
       for (const buddy of raw.buddies) {
-        // We don't know the current user ID client-side, so include both sides
-        // The server action already filters to only accepted buddies for this user
-        buddyIds.add(buddy.requester_id);
-        buddyIds.add(buddy.recipient_id);
+        const otherId =
+          buddy.requester_id === raw.userId
+            ? buddy.recipient_id
+            : buddy.requester_id;
+        if (!buddyIds.includes(otherId)) {
+          buddyIds.push(otherId);
+        }
       }
 
-      // Fetch buddy activity (admin bypasses RLS)
+      // Fetch buddy activity (admin bypasses RLS, server verifies authorization)
       let buddyActivity: BuddyActivityData[] = [];
-      if (buddyIds.size > 0) {
-        const buddyResult = await getBuddyActivity(Array.from(buddyIds));
+      if (buddyIds.length > 0) {
+        const buddyResult = await getBuddyActivity(buddyIds);
         if (buddyResult.data) {
           buddyActivity = buddyResult.data;
         }

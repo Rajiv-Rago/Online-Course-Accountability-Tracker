@@ -66,10 +66,12 @@ export interface DashboardCourseData {
   targetCompletionDate: string | null;
 }
 
+export type ActivityIcon = 'Clock' | 'Trophy' | 'AlertTriangle';
+
 export interface ActivityItemData {
   id: string;
   type: 'session' | 'achievement' | 'analysis';
-  icon: string;
+  icon: ActivityIcon;
   description: string;
   timestamp: string;
   relativeTime: string;
@@ -93,6 +95,50 @@ export interface BuddyActivityItem {
   buddyName: string;
   buddyAvatar: string | null;
   recentSession: { courseTitle: string; startedAt: string } | null;
+}
+
+// ---------------------------------------------------------------------------
+// Timezone helpers
+// ---------------------------------------------------------------------------
+
+/** Get the current date string (YYYY-MM-DD) in the user's timezone */
+export function getTodayDateStr(timezone?: string): string {
+  const now = new Date();
+  if (timezone) {
+    try {
+      // Format as YYYY-MM-DD in the user's timezone
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: timezone,
+      }).format(now);
+      return parts; // en-CA locale formats as YYYY-MM-DD
+    } catch {
+      // fallback to UTC
+    }
+  }
+  return now.toISOString().split('T')[0];
+}
+
+/** Get the current day of week in the user's timezone */
+export function getTodayDayOfWeek(timezone?: string): DayOfWeek {
+  const dayNames: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  if (timezone) {
+    try {
+      const weekday = new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        timeZone: timezone,
+      }).format(new Date()).toLowerCase();
+      const map: Record<string, DayOfWeek> = {
+        sun: 'sun', mon: 'mon', tue: 'tue', wed: 'wed', thu: 'thu', fri: 'fri', sat: 'sat',
+      };
+      return map[weekday] ?? dayNames[new Date().getDay()];
+    } catch {
+      // fallback
+    }
+  }
+  return dayNames[new Date().getDay()];
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +168,7 @@ export function getGreeting(timezone?: string): string {
   return 'Burning the midnight oil';
 }
 
-export function calculateStreak(dailyStats: DailyStat[]): number {
+export function calculateStreak(dailyStats: DailyStat[], timezone?: string): number {
   if (dailyStats.length === 0) return 0;
 
   // dailyStats are ordered DESC by date
@@ -130,20 +176,21 @@ export function calculateStreak(dailyStats: DailyStat[]): number {
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  // Use the user's timezone to determine "today"
+  const todayStr = getTodayDateStr(timezone);
+  const todayDate = new Date(todayStr + 'T00:00:00');
+  const yesterdayDate = new Date(todayDate);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
 
   let streak = 0;
-  let checkDate = today;
+  let checkDate = todayDate;
 
   // Start from today; if today is not a streak day, try yesterday as starting point
   const firstStatDate = new Date(sorted[0].date + 'T00:00:00');
-  if (firstStatDate.getTime() === today.getTime()) {
+  if (firstStatDate.getTime() === todayDate.getTime()) {
     if (!sorted[0].streak_day) return 0;
-  } else if (firstStatDate.getTime() === yesterday.getTime()) {
-    checkDate = yesterday;
+  } else if (firstStatDate.getTime() === yesterdayDate.getTime()) {
+    checkDate = yesterdayDate;
   } else {
     return 0;
   }
@@ -338,15 +385,24 @@ export function distributeDailyGoal(
     }));
   };
 
-  const p1Budget = Math.floor(dailyGoalMins * 0.5);
-  const p2Budget = Math.floor(dailyGoalMins * 0.3);
-  const restBudget = dailyGoalMins - p1Budget - p2Budget;
+  // Weight-based budget: only allocate to non-empty groups, then split proportionally
+  const weights = [
+    { group: p1, weight: 5 },
+    { group: p2, weight: 3 },
+    { group: rest, weight: 2 },
+  ].filter((g) => g.group.length > 0);
 
-  return [
-    ...distribute(p1, p1Budget),
-    ...distribute(p2, p2Budget),
-    ...distribute(rest, restBudget),
-  ];
+  const totalWeight = weights.reduce((sum, w) => sum + w.weight, 0);
+
+  const results: PlanCourseItemData[] = [];
+  for (const { group, weight } of weights) {
+    const budget = totalWeight > 0
+      ? Math.round((weight / totalWeight) * dailyGoalMins)
+      : 0;
+    results.push(...distribute(group, budget));
+  }
+
+  return results;
 }
 
 export function calcProgress(
@@ -384,11 +440,6 @@ export function getRiskBadgeVariant(
     default:
       return 'outline';
   }
-}
-
-export function getTodayDayOfWeek(): DayOfWeek {
-  const days: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  return days[new Date().getDay()];
 }
 
 export function mapCourseToDashboardData(
