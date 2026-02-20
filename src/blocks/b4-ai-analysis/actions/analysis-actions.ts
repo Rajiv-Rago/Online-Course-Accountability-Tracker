@@ -5,16 +5,12 @@ import type {
   AiAnalysis,
   WeeklyReport,
   RiskLevel,
+  ActionResult,
 } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-interface ActionResult<T = void> {
-  data?: T;
-  error?: string;
-}
 
 async function getAuthUserId(): Promise<string> {
   const supabase = await createClient();
@@ -25,6 +21,9 @@ async function getAuthUserId(): Promise<string> {
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
 }
+
+// Columns to return for analyses (excludes raw_prompt, raw_response, tokens_used)
+const ANALYSIS_COLUMNS = 'id, user_id, course_id, analysis_type, risk_score, risk_level, insights, interventions, patterns, model, created_at';
 
 // ---------------------------------------------------------------------------
 // Types for joined analysis data
@@ -56,14 +55,15 @@ export async function fetchLatestAnalyses(): Promise<ActionResult<AnalysisWithCo
     await getAuthUserId();
     const supabase = await createClient();
 
-    // Get latest daily analysis per course by using distinct on
-    // Supabase JS doesn't support DISTINCT ON, so we fetch recent and deduplicate
+    // Fetch enough rows to cover all active courses after deduplication.
+    // 200 rows covers users with up to ~200 days of history across all courses.
+    // Note: !inner join intentionally excludes analyses for deleted courses (course_id set to NULL on delete).
     const { data, error } = await supabase
       .from('ai_analyses')
-      .select('*, courses!inner(title, platform)')
+      .select(`${ANALYSIS_COLUMNS}, courses!inner(title, platform)`)
       .eq('analysis_type', 'daily')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) return { error: error.message };
 
@@ -105,7 +105,7 @@ export async function fetchAnalysisHistory(
 
     const { data, error } = await supabase
       .from('ai_analyses')
-      .select('*')
+      .select(ANALYSIS_COLUMNS)
       .eq('course_id', courseId)
       .eq('analysis_type', 'daily')
       .order('created_at', { ascending: false })
@@ -179,13 +179,13 @@ export async function fetchRiskSummary(): Promise<ActionResult<RiskSummary>> {
     await getAuthUserId();
     const supabase = await createClient();
 
-    // Get latest analysis per in_progress course
+    // Fetch enough rows to cover all courses after deduplication
     const { data: analyses, error } = await supabase
       .from('ai_analyses')
       .select('course_id, risk_score, risk_level, courses!inner(title, priority, status)')
       .eq('analysis_type', 'daily')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) return { error: error.message };
 

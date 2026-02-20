@@ -61,7 +61,7 @@ function HistoryEntry({ analysis }: { analysis: AiAnalysis }) {
                   </h4>
                   <div className="space-y-2">
                     {analysis.interventions.map((intervention, i) => (
-                      <InterventionCard key={i} intervention={intervention} />
+                      <InterventionCard key={`${intervention.type}-${i}`} intervention={intervention} />
                     ))}
                   </div>
                 </div>

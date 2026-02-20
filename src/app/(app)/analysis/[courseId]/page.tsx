@@ -98,7 +98,7 @@ export default function CourseAnalysisPage({
                   <h3 className="text-sm font-medium mb-2">Recommended Actions</h3>
                   <div className="space-y-2">
                     {latest.interventions.map((intervention, i) => (
-                      <InterventionCard key={i} intervention={intervention} />
+                      <InterventionCard key={`${intervention.type}-${i}`} intervention={intervention} />
                     ))}
                   </div>
                 </div>

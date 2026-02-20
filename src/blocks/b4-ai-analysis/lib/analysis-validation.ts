@@ -16,7 +16,7 @@ export const interventionSchema = z.object({
   type: z.enum(['encouragement', 'action', 'reminder', 'escalation']),
   message: z.string().min(1).max(1000),
   priority: z.enum(['low', 'medium', 'high']),
-  action_url: z.string().nullable().default(null),
+  action_url: z.string().url().startsWith('http').nullable().default(null),
 });
 
 export const patternSchema = z.object({

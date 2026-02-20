@@ -7,17 +7,17 @@ interface RiskLevelIndicatorProps {
   level: RiskLevel;
 }
 
-const levelConfig: Record<RiskLevel, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  low: { label: 'Low Risk', variant: 'secondary' },
-  medium: { label: 'Medium Risk', variant: 'outline' },
-  high: { label: 'High Risk', variant: 'default' },
-  critical: { label: 'Critical Risk', variant: 'destructive' },
+const levelConfig: Record<RiskLevel, { label: string; className: string }> = {
+  low: { label: 'Low Risk', className: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400' },
+  medium: { label: 'Medium Risk', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-400' },
+  high: { label: 'High Risk', className: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-400' },
+  critical: { label: 'Critical Risk', className: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-400' },
 };
 
 export function RiskLevelIndicator({ level }: RiskLevelIndicatorProps) {
   const config = levelConfig[level];
   return (
-    <Badge variant={config.variant}>
+    <Badge variant="outline" className={config.className}>
       {config.label}
     </Badge>
   );

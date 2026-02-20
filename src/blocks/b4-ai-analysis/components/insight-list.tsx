@@ -23,7 +23,7 @@ export function InsightList({ insights, maxVisible = 3 }: InsightListProps) {
   return (
     <div className="space-y-2">
       {visible.map((insight, i) => (
-        <InsightCard key={i} insight={insight} />
+        <InsightCard key={`${insight.type}-${insight.title}-${i}`} insight={insight} />
       ))}
       {hasMore && (
         <Button

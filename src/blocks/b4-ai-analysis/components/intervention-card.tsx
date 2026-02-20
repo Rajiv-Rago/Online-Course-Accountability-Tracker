@@ -33,9 +33,10 @@ export function InterventionCard({ intervention }: InterventionCardProps) {
               </span>
             </div>
             <p className="text-sm">{intervention.message}</p>
-            {intervention.action_url && (
+            {intervention.action_url && intervention.action_url.startsWith('http') && (
               <a
                 href={intervention.action_url}
+                rel="noopener noreferrer"
                 className="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
               >
                 Take action

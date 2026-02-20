@@ -72,17 +72,3 @@ export function AnalysisLoadingDetail() {
     </div>
   );
 }
-
-export function AnalysisLoadingCard() {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <Skeleton className="h-5 w-36" />
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-2/3" />
-      </CardContent>
-    </Card>
-  );
-}

@@ -115,12 +115,31 @@ async function retryWithBackoff<T>(
   throw lastError;
 }
 
-function getToday(): string {
-  return new Date().toISOString().split('T')[0];
+/** Get today's date string in the user's timezone (defaults to UTC). */
+function getTodayInTimezone(timezone: string): string {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(new Date()); // "YYYY-MM-DD"
+  } catch {
+    return new Date().toISOString().split('T')[0]; // fallback to UTC
+  }
+}
+
+/** Truncate text and only append "..." if actually truncated. */
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength) + '...';
 }
 
 // ---------------------------------------------------------------------------
 // Daily Analysis Pipeline
+// NOTE: Processes users sequentially. For large user bases (200+), consider
+// splitting into per-user queue jobs to avoid Vercel function timeouts.
 // ---------------------------------------------------------------------------
 
 export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
@@ -134,16 +153,15 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
   const supabase = createAdminClient();
   const rateLimiter = new RateLimiter();
   const systemPrompt = buildSystemPrompt();
-  const today = getToday();
 
   let processed = 0;
   let errors = 0;
   let skipped = 0;
 
-  // Get all onboarded users
+  // Get all onboarded users (include timezone for date calculations)
   const { data: users, error: usersError } = await supabase
     .from('user_profiles')
-    .select('id, motivation_style, daily_study_goal_mins')
+    .select('id, motivation_style, daily_study_goal_mins, timezone')
     .eq('onboarding_completed', true);
 
   if (usersError || !users) {
@@ -151,6 +169,8 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
   }
 
   for (const user of users) {
+    const today = getTodayInTimezone(user.timezone ?? 'UTC');
+
     // Get in_progress courses for this user
     const { data: courses, error: coursesError } = await supabase
       .from('courses')
@@ -163,6 +183,22 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
     if (coursesError || !courses) {
       errors++;
       continue;
+    }
+
+    // H3 fix: Hoist streak query outside per-course loop (streak is per-user, not per-course)
+    const { data: streakData } = await supabase
+      .from('daily_stats')
+      .select('streak_day, date')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(30);
+
+    let currentStreak = 0;
+    if (streakData) {
+      for (const day of streakData) {
+        if (day.streak_day) currentStreak++;
+        else break;
+      }
     }
 
     for (const course of courses) {
@@ -189,22 +225,6 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
         const daysInactive = lastSessionDate
           ? Math.floor((Date.now() - new Date(lastSessionDate).getTime()) / 86400000)
           : 30;
-
-        // Get current streak from daily_stats
-        const { data: streakData } = await supabase
-          .from('daily_stats')
-          .select('streak_day, date')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false })
-          .limit(30);
-
-        let currentStreak = 0;
-        if (streakData) {
-          for (const day of streakData) {
-            if (day.streak_day) currentStreak++;
-            else break;
-          }
-        }
 
         // Build prompt context
         const promptContext: CourseAnalysisPromptContext = {
@@ -267,9 +287,11 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
           })
           .reduce((sum, s) => sum + s.durationMinutes, 0);
 
+        // M3 fix: Only flag streakBroken if course has had at least one session
+        const hasAnySessions = recentSessions.length > 0;
         const riskCtx: RiskContext = {
           daysInactive,
-          streakBroken: currentStreak === 0 && daysInactive > 1,
+          streakBroken: hasAnySessions && currentStreak === 0 && daysInactive > 1,
           hoursLastWeek: weekMinutes / 60,
           hoursPrevWeek: prevWeekMinutes / 60,
           progressPercent,
@@ -338,10 +360,13 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
   const weekStartStr = weekStart.toISOString().split('T')[0];
   const weekEndStr = weekEnd.toISOString().split('T')[0];
 
+  // Next day after week end for exclusive upper bound
+  const dayAfterWeekEnd = new Date(weekEnd.getTime() + 86400000);
+  const dayAfterWeekEndStr = dayAfterWeekEnd.toISOString().split('T')[0];
+
   // Previous week for comparison
   const prevWeekStart = new Date(weekStart.getTime() - 7 * 86400000);
   const prevWeekStartStr = prevWeekStart.toISOString().split('T')[0];
-  const prevWeekEndStr = new Date(weekStart.getTime() - 86400000).toISOString().split('T')[0];
 
   let processed = 0;
   let errors = 0;
@@ -372,13 +397,13 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
         continue; // Already generated
       }
 
-      // Get sessions for this week
+      // M5 fix: Use .lt() with next day instead of .lte() with T23:59:59Z
       const { data: sessions } = await supabase
         .from('study_sessions')
         .select('course_id, duration_minutes, modules_completed, started_at, courses!inner(title)')
         .eq('user_id', user.id)
         .gte('started_at', weekStartStr + 'T00:00:00Z')
-        .lte('started_at', weekEndStr + 'T23:59:59Z');
+        .lt('started_at', dayAfterWeekEndStr + 'T00:00:00Z');
 
       const sessionList = sessions ?? [];
 
@@ -419,13 +444,13 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
         }
       }
 
-      // Get previous week minutes for comparison
+      // M5 fix: Previous week also uses .lt() with exclusive upper bound
       const { data: prevSessions } = await supabase
         .from('study_sessions')
         .select('duration_minutes')
         .eq('user_id', user.id)
         .gte('started_at', prevWeekStartStr + 'T00:00:00Z')
-        .lte('started_at', prevWeekEndStr + 'T23:59:59Z');
+        .lt('started_at', weekStartStr + 'T00:00:00Z');
 
       const prevWeekMinutes = prevSessions
         ? prevSessions.reduce((sum, s) => sum + s.duration_minutes, 0)
@@ -505,11 +530,13 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
 
       // Create notification for users who have weekly report notifications enabled
       if (user.notify_weekly_report) {
+        // L4 fix: Only append "..." when summary is actually truncated
+        const summaryPreview = truncateText(reportResult.ai_summary, 100);
         await supabase.from('notifications').insert({
           user_id: user.id,
           type: 'weekly_report',
           title: 'Weekly Report Ready',
-          message: `Your weekly study report for ${weekStartStr} is ready. ${reportResult.ai_summary.slice(0, 100)}...`,
+          message: `Your weekly study report for ${weekStartStr} is ready. ${summaryPreview}`,
           action_url: '/analysis/weekly',
           channels_sent: ['in_app'],
           metadata: { week_start: weekStartStr, tokens_used: tokensUsed },
