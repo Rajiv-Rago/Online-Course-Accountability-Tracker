@@ -17,7 +17,7 @@ npm run test:e2e:ui  # Playwright with interactive UI
 
 ### Test Stack
 
-- **Vitest** (775 tests, 41 files) — Unit, integration, server action, security, and spec compliance tests. Config: `vitest.config.ts`. Global setup mocks Supabase, OpenAI, and Next.js server utilities.
+- **Vitest** (868 tests, 41 files) — Unit, integration, server action, security, and spec compliance tests. Config: `vitest.config.ts`. Global setup mocks Supabase, OpenAI, and Next.js server utilities.
 - **Playwright** (104 tests, 8 files) — E2E browser tests across chromium + mobile. Config: `playwright.config.ts`. Auth tests in `e2e/auth.spec.ts` run without credentials. Authenticated tests require `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` env vars.
 - Test infrastructure: `src/test/` (mocks, factories, helpers). E2E helpers: `e2e/helpers/`.
 
