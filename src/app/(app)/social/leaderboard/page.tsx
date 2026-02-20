@@ -1,11 +1,11 @@
-export default function LeaderboardPage() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 className="text-3xl font-bold mb-2">Leaderboard</h1>
-      <p className="text-muted-foreground mb-4">Block B7 - Coming Soon</p>
-      <p className="text-sm text-muted-foreground max-w-md">
-        Weekly study hours leaderboard among buddies.
-      </p>
-    </div>
-  );
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { LeaderboardView } from '@/blocks/b7-social/components/leaderboard-view';
+
+export default async function LeaderboardPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect('/login');
+
+  return <LeaderboardView currentUserId={user.id} />;
 }

@@ -1,0 +1,35 @@
+import {
+  Play,
+  Flame,
+  GraduationCap,
+  Moon,
+  Sunrise,
+  Timer,
+  Crown,
+  Zap,
+  Users,
+  RotateCcw,
+  CheckCircle,
+  Compass,
+  Heart,
+  type LucideIcon,
+} from 'lucide-react';
+import type { AchievementType } from '@/lib/types';
+
+export const ACHIEVEMENT_ICONS: Record<AchievementType, LucideIcon> = {
+  first_session: Play,
+  streak_7: Flame,
+  streak_30: Flame,
+  streak_100: Flame,
+  course_complete: GraduationCap,
+  night_owl: Moon,
+  early_bird: Sunrise,
+  marathon: Timer,
+  consistency_king: Crown,
+  speed_learner: Zap,
+  social_butterfly: Users,
+  comeback_kid: RotateCcw,
+  perfectionist: CheckCircle,
+  explorer: Compass,
+  dedication: Heart,
+};

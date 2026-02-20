@@ -256,6 +256,7 @@ export interface Achievement {
   course_id: string | null;                     // UUID, FK to courses (nullable, ON DELETE SET NULL)
   metadata: Record<string, unknown> | null;     // JSONB, flexible shape
   earned_at: string;                            // ISO 8601 timestamptz, default now()
+  shared: boolean;                              // default false, visible to buddies when true
 }
 
 // =============================================================================
@@ -381,6 +382,32 @@ export interface RiskTrendPoint {
 export interface DistributionBucket {
   range: string;                                // e.g. "0-15", "15-30", "morning"
   count: number;
+}
+
+// -----------------------------------------------------------------------------
+// BuddyWithProfile -- Study buddy row enriched with the other user's profile
+// -----------------------------------------------------------------------------
+export interface BuddyWithProfile {
+  id: string;                                   // study_buddies row id
+  buddy_user_id: string;                        // the OTHER user's id
+  status: BuddyStatus;
+  display_name: string;
+  avatar_url: string | null;
+  created_at: string;
+  is_requester: boolean;                        // did current user send the request?
+}
+
+// -----------------------------------------------------------------------------
+// LockedAchievement -- An achievement the user hasn't earned yet, with progress
+// -----------------------------------------------------------------------------
+export interface LockedAchievement {
+  achievement_type: AchievementType;
+  name: string;
+  description: string;
+  category: string;
+  progress: number;                             // 0-100
+  current: number;
+  target: number;
 }
 
 // =============================================================================
