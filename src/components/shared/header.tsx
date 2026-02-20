@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Menu, BookOpen } from "lucide-react";
+import { Menu, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/blocks/b6-notifications/components/notification-bell";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -28,16 +29,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex flex-1 justify-end gap-4">
-        <Link
-          href="/notifications"
-          className={cn(
-            "relative flex items-center justify-center rounded-lg p-2",
-            "text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          )}
-        >
-          <Bell className="h-5 w-5" />
-          {/* Unread count badge - wired by B6 during integration */}
-        </Link>
+        <NotificationBell />
 
         <Link
           href="/settings"
