@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from './channel-adapters/email-adapter';
 import { sendSlack } from './channel-adapters/slack-adapter';
 import { sendDiscord } from './channel-adapters/discord-adapter';
+import { sendPush } from './channel-adapters/push-adapter';
 import type { NotificationChannel } from '@/lib/types/enums';
 
 interface NotificationRow {
@@ -124,6 +125,37 @@ export async function sendToChannels(
       channelsSent.push('discord');
     } else {
       errors.push(`discord: ${result.error}`);
+    }
+  }
+
+  // Push
+  if (
+    defaultChannels.includes('push') &&
+    userPrefs.notify_push
+  ) {
+    // Fetch the user's push subscription if stored
+    const { data: subData } = await supabase
+      .from('user_profiles')
+      .select('push_subscription')
+      .eq('id', notification.user_id)
+      .single();
+
+    const subscription = subData?.push_subscription as
+      | { endpoint: string; keys?: { p256dh: string; auth: string } }
+      | null;
+
+    if (subscription?.endpoint) {
+      const result = await sendPush({
+        subscription,
+        title: notification.title,
+        body: notification.message,
+        actionUrl: notification.action_url ?? undefined,
+      });
+      if (result.success) {
+        channelsSent.push('push');
+      } else {
+        errors.push(`push: ${result.error}`);
+      }
     }
   }
 

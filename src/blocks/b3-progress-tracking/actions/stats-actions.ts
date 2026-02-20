@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { DailyStat } from '@/lib/types';
 import { STREAK_THRESHOLD_MINUTES } from '../lib/streak-calculator';
+import { checkAchievements } from '@/blocks/b7-social/actions/achievement-actions';
+import { sendToChannels } from '@/blocks/b6-notifications/lib/notification-sender';
 
 interface ActionResult<T = void> {
   data?: T;
@@ -76,6 +78,40 @@ export async function upsertDailyStats(
       .single();
 
     if (error) return { error: error.message };
+
+    // Check for daily-stats-based achievements (streaks, consistency, dedication)
+    await checkAchievements('daily_stats_updated').catch(() => {});
+
+    // Create streak_warning notification if user had a streak but didn't study enough today
+    if (!streakDay && totalMinutes > 0) {
+      // Only warn if they were on a streak (check yesterday)
+      const yesterday = new Date(new Date(date).getTime() - 86400000)
+        .toISOString()
+        .split('T')[0];
+      const { data: yesterdayStats } = await supabase
+        .from('daily_stats')
+        .select('streak_day')
+        .eq('user_id', userId)
+        .eq('date', yesterday)
+        .maybeSingle();
+
+      if (yesterdayStats?.streak_day) {
+        const remaining = STREAK_THRESHOLD_MINUTES - totalMinutes;
+        const { data: streakNotif } = await supabase.from('notifications').insert({
+          user_id: userId,
+          type: 'streak_warning',
+          title: 'Streak at risk!',
+          message: `You need ${remaining} more minutes today to keep your streak alive.`,
+          action_url: '/progress',
+          channels_sent: ['in_app'],
+        }).select().single();
+
+        if (streakNotif) {
+          await sendToChannels(streakNotif).catch(() => {});
+        }
+      }
+    }
+
     return { data: data as DailyStat };
   } catch (e) {
     return { error: (e as Error).message };

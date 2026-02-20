@@ -1,14 +1,15 @@
 /**
- * Web Push adapter stub.
+ * Web Push adapter.
  *
- * Push notifications require the `web-push` npm package and VAPID keys.
- * Since `web-push` is not currently installed, this adapter returns a
- * graceful "not configured" error. When you're ready to enable push:
+ * Uses the `web-push` npm package to send push notifications.
+ * Requires VAPID keys configured via environment variables:
+ *   - NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ *   - VAPID_PRIVATE_KEY
  *
- *   1. npm install web-push
- *   2. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars
- *   3. Implement the full push logic below
+ * If keys are not configured, returns a graceful error.
  */
+
+import webpush from 'web-push';
 
 interface PushSubscriptionJSON {
   endpoint: string;
@@ -18,7 +19,7 @@ interface PushSubscriptionJSON {
   };
 }
 
-export async function sendPush(_params: {
+export async function sendPush(params: {
   subscription: PushSubscriptionJSON;
   title: string;
   body: string;
@@ -31,7 +32,38 @@ export async function sendPush(_params: {
     return { success: false, error: 'VAPID keys not configured' };
   }
 
-  // web-push package is not installed. Return gracefully.
-  // When installed, use: webpush.setVapidDetails(...) + webpush.sendNotification(...)
-  return { success: false, error: 'web-push package not installed - push notifications disabled' };
+  if (!params.subscription.endpoint || !params.subscription.keys) {
+    return { success: false, error: 'Invalid push subscription' };
+  }
+
+  try {
+    webpush.setVapidDetails(
+      `mailto:${process.env.VAPID_CONTACT_EMAIL ?? 'noreply@example.com'}`,
+      publicKey,
+      privateKey
+    );
+
+    const payload = JSON.stringify({
+      title: params.title,
+      body: params.body,
+      url: params.actionUrl ?? '/',
+    });
+
+    await webpush.sendNotification(
+      {
+        endpoint: params.subscription.endpoint,
+        keys: params.subscription.keys,
+      },
+      payload
+    );
+
+    return { success: true };
+  } catch (err: unknown) {
+    const statusCode = (err as { statusCode?: number }).statusCode;
+    // 410 Gone = subscription expired, 404 = not found
+    if (statusCode === 410 || statusCode === 404) {
+      return { success: false, error: 'Push subscription expired' };
+    }
+    return { success: false, error: (err as Error).message ?? 'Push send failed' };
+  }
 }

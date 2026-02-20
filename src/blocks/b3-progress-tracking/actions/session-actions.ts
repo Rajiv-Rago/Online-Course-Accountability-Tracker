@@ -10,6 +10,7 @@ import {
   type UpdateSessionInput,
 } from '../lib/session-validation';
 import { upsertDailyStats } from './stats-actions';
+import { checkAchievements } from '@/blocks/b7-social/actions/achievement-actions';
 
 interface ActionResult<T = void> {
   data?: T;
@@ -63,6 +64,9 @@ export async function createSession(
 
     // Recalculate daily stats (trigger handles basic insert, but we need streak_day)
     await upsertDailyStats(userId, parsed.date);
+
+    // Check for session-based achievements
+    await checkAchievements('session_logged').catch(() => {});
 
     revalidatePath('/progress');
     revalidatePath('/courses');

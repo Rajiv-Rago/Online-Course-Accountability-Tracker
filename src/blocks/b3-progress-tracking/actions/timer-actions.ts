@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { StudySession } from '@/lib/types';
 import { upsertDailyStats } from './stats-actions';
+import { checkAchievements } from '@/blocks/b7-social/actions/achievement-actions';
 
 interface ActionResult<T = void> {
   data?: T;
@@ -136,6 +137,9 @@ export async function finalizeTimerSession(
       .toISOString()
       .split('T')[0];
     await upsertDailyStats(userId, sessionDate);
+
+    // Check for session-based achievements
+    await checkAchievements('session_logged').catch(() => {});
 
     revalidatePath('/progress');
     revalidatePath('/courses');

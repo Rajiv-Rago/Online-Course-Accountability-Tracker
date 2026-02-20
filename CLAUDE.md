@@ -8,9 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev          # Start dev server (localhost:3000)
 npm run build        # Production build
 npm run lint         # ESLint (next/core-web-vitals)
+npm run test         # Vitest unit/integration tests
+npm run test:watch   # Vitest in watch mode
+npm run test:coverage # Vitest with v8 coverage
+npm run test:e2e     # Playwright E2E tests (requires dev server)
+npm run test:e2e:ui  # Playwright with interactive UI
 ```
 
-No test framework is configured yet.
+### Test Stack
+
+- **Vitest** (775 tests, 41 files) — Unit, integration, server action, security, and spec compliance tests. Config: `vitest.config.ts`. Global setup mocks Supabase, OpenAI, and Next.js server utilities.
+- **Playwright** (104 tests, 8 files) — E2E browser tests across chromium + mobile. Config: `playwright.config.ts`. Auth tests in `e2e/auth.spec.ts` run without credentials. Authenticated tests require `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` env vars.
+- Test infrastructure: `src/test/` (mocks, factories, helpers). E2E helpers: `e2e/helpers/`.
 
 ## Architecture
 

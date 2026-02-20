@@ -24,10 +24,14 @@ export const createCourseSchema = z.object({
   target_completion_date: z.string().nullable().refine(
     (val) => {
       if (!val) return true;
-      const date = new Date(val);
+      // Compare as YYYY-MM-DD strings to avoid UTC vs local timezone mismatch
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return date >= today;
+      const todayStr = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+      ].join('-');
+      return val >= todayStr;
     },
     { message: 'Target date must be in the future' }
   ),

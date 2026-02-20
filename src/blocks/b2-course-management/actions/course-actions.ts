@@ -11,6 +11,7 @@ import {
   type UpdateCourseInput,
 } from '../lib/course-validation';
 import { isValidTransition } from '../lib/course-utils';
+import { checkAchievements } from '@/blocks/b7-social/actions/achievement-actions';
 
 interface ActionResult<T = void> {
   data?: T;
@@ -318,6 +319,9 @@ export async function transitionStatus(
       .single();
 
     if (error) return { error: error.message };
+
+    // Check for course-status-based achievements (e.g., course completion)
+    await checkAchievements('course_status_changed').catch(() => {});
 
     revalidatePath('/courses');
     revalidatePath(`/courses/${courseId}`);

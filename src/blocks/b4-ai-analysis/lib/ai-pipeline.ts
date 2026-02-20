@@ -17,6 +17,7 @@ import {
   type RiskContext,
 } from './risk-calculator';
 import type { MotivationStyle } from '@/lib/types';
+import { sendToChannels } from '@/blocks/b6-notifications/lib/notification-sender';
 
 // ---------------------------------------------------------------------------
 // Rate limiter (token bucket)
@@ -326,6 +327,29 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
           errors++;
         } else {
           processed++;
+
+          // Create risk_alert notification for high or critical risk courses
+          if (risk.level === 'high' || risk.level === 'critical') {
+            const topInsight = analysisResult.insights?.[0]?.description ?? 'Your course needs attention.';
+            const { data: riskNotif } = await supabase.from('notifications').insert({
+              user_id: user.id,
+              type: 'risk_alert',
+              title: `${risk.level === 'critical' ? 'Critical' : 'High'} Risk: ${course.title}`,
+              message: topInsight,
+              action_url: `/courses/${course.id}`,
+              channels_sent: ['in_app'],
+              metadata: {
+                course_id: course.id,
+                risk_score: risk.score,
+                risk_level: risk.level,
+              },
+            }).select().single();
+
+            // Deliver via configured channels (email, push, etc.)
+            if (riskNotif) {
+              await sendToChannels(riskNotif).catch(() => {});
+            }
+          }
         }
       } catch {
         errors++;
@@ -532,7 +556,7 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
       if (user.notify_weekly_report) {
         // L4 fix: Only append "..." when summary is actually truncated
         const summaryPreview = truncateText(reportResult.ai_summary, 100);
-        await supabase.from('notifications').insert({
+        const { data: reportNotif } = await supabase.from('notifications').insert({
           user_id: user.id,
           type: 'weekly_report',
           title: 'Weekly Report Ready',
@@ -540,7 +564,12 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
           action_url: '/analysis/weekly',
           channels_sent: ['in_app'],
           metadata: { week_start: weekStartStr, tokens_used: tokensUsed },
-        });
+        }).select().single();
+
+        // Deliver via configured channels (email, push, etc.)
+        if (reportNotif) {
+          await sendToChannels(reportNotif).catch(() => {});
+        }
       }
 
       processed++;
