@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { User, Bell, Link2, Shield } from 'lucide-react';
+import { User, Bell, Link2, Shield, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { href: '/settings/profile', label: 'Profile', icon: User },
   { href: '/settings/notifications', label: 'Notifications', icon: Bell },
   { href: '/settings/integrations', label: 'Integrations', icon: Link2 },
+  { href: '/settings/ai', label: 'AI Model', icon: Sparkles },
   { href: '/settings/account', label: 'Account', icon: Shield },
 ];
 

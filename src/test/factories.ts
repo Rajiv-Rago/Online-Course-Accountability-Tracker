@@ -50,6 +50,7 @@ export function buildProfile(overrides: Partial<UserProfile> = {}): UserProfile 
     notify_risk_alert: true,
     slack_webhook_url: null,
     discord_webhook_url: null,
+    preferred_ai_model: 'openai:gpt-4o',
     onboarding_completed: true,
     onboarding_step: 5,
     created_at: now,
@@ -157,7 +158,7 @@ export function buildAnalysis(overrides: Partial<AiAnalysis> = {}): AiAnalysis {
     raw_prompt: null,
     raw_response: null,
     tokens_used: 700,
-    model: 'gpt-4',
+    model: 'openai:gpt-4o',
     created_at: now,
     ...overrides,
   };

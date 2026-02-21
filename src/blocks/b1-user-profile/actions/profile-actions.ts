@@ -8,6 +8,7 @@ import {
 } from '../lib/profile-validation';
 import { z } from 'zod';
 import { getAuthUser } from './get-auth-user';
+import { isValidModelId } from '@/lib/ai/models';
 
 export async function getProfile(): Promise<UserProfile> {
   const { supabase, userId } = await getAuthUser();
@@ -59,6 +60,21 @@ export async function completeOnboarding(
   if (error) throw new Error(error.message);
   revalidatePath('/');
   return data as UserProfile;
+}
+
+export async function updatePreferredAiModel(modelId: string): Promise<void> {
+  if (!isValidModelId(modelId)) {
+    throw new Error('Invalid AI model');
+  }
+  const { supabase, userId } = await getAuthUser();
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ preferred_ai_model: modelId })
+    .eq('id', userId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath('/settings/ai');
 }
 
 export async function updateOnboardingStep(step: number): Promise<void> {

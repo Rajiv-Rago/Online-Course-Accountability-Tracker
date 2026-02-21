@@ -17,13 +17,13 @@ npm run test:e2e:ui  # Playwright with interactive UI
 
 ### Test Stack
 
-- **Vitest** (868 tests, 41 files) — Unit, integration, server action, security, and spec compliance tests. Config: `vitest.config.ts`. Global setup mocks Supabase, OpenAI, and Next.js server utilities.
+- **Vitest** (868 tests, 41 files) — Unit, integration, server action, security, and spec compliance tests. Config: `vitest.config.ts`. Global setup mocks Supabase, Vercel AI SDK, and Next.js server utilities.
 - **Playwright** (104 tests, 8 files) — E2E browser tests across chromium + mobile. Config: `playwright.config.ts`. Auth tests in `e2e/auth.spec.ts` run without credentials. Authenticated tests require `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` env vars.
 - Test infrastructure: `src/test/` (mocks, factories, helpers). E2E helpers: `e2e/helpers/`.
 
 ## Architecture
 
-AI-powered course accountability tracker built with **Next.js 14 App Router**, **Supabase** (Postgres + Auth), **OpenAI GPT-4**, deployed on **Vercel**.
+AI-powered course accountability tracker built with **Next.js 14 App Router**, **Supabase** (Postgres + Auth), **Vercel AI SDK** (multi-provider: OpenAI, Anthropic, Google, Groq, Cerebras), deployed on **Vercel**.
 
 ### Routing & Layouts
 
@@ -78,4 +78,6 @@ Comprehensive specs in `docs/`: `SPEC.md`, `ARCHITECTURE.md`, `DATABASE.md`, `AP
 
 ## Environment Variables
 
-Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
+Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
+
+AI providers (at least one required): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`

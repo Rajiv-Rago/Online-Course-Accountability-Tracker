@@ -55,6 +55,7 @@ export interface UserProfile {
   notify_risk_alert: boolean;                   // default true
   slack_webhook_url: string | null;
   discord_webhook_url: string | null;
+  preferred_ai_model: string;                   // default 'openai:gpt-4o'
   onboarding_completed: boolean;                // default false
   onboarding_step: number;                      // default 0
   created_at: string;                           // ISO 8601 timestamptz
@@ -131,7 +132,7 @@ export interface AiAnalysis {
   raw_prompt: string | null;
   raw_response: string | null;
   tokens_used: number | null;
-  model: string;                                // default 'gpt-4'
+  model: string;                                // "provider:model" format, e.g. 'openai:gpt-4o'
   created_at: string;                           // ISO 8601 timestamptz
 }
 

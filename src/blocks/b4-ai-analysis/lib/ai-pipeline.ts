@@ -1,5 +1,7 @@
-import OpenAI from 'openai';
+import { generateObject } from 'ai';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getModel, callWithFallback, DEFAULT_MODEL } from '@/lib/ai/provider-registry';
+import { courseAnalysisResponseSchema, weeklyReportResponseSchema } from './analysis-validation';
 import {
   buildSystemPrompt,
   buildCourseAnalysisPrompt,
@@ -10,7 +12,6 @@ import {
   type SessionSummary,
   type WeeklyReportPromptContext,
 } from './prompt-builder';
-import { parseCourseAnalysisResponse, parseWeeklyReportResponse } from './response-parser';
 import {
   calculateAdjustedRisk,
   calculateExpectedProgress,
@@ -63,58 +64,11 @@ export interface PipelineConfig {
   model?: string;
 }
 
-const DEFAULT_MODEL = 'gpt-4o';
 const MAX_SESSION_HISTORY_TOKENS = 2000;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-async function callOpenAI(
-  client: OpenAI,
-  systemPrompt: string,
-  userPrompt: string,
-  model: string,
-): Promise<{ content: string; tokensUsed: number }> {
-  const response = await client.chat.completions.create({
-    model,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 2000,
-  });
-
-  const content = response.choices[0]?.message?.content ?? '';
-  const tokensUsed = response.usage?.total_tokens ?? estimateTokens(systemPrompt + userPrompt + content);
-
-  return { content, tokensUsed };
-}
-
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries: number = 2,
-): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (err: unknown) {
-      lastError = err;
-      const status = (err as { status?: number }).status;
-      // Retry on rate limit (429) or server errors (5xx)
-      if (status === 429 || (status && status >= 500)) {
-        const delay = Math.pow(2, attempt) * 1000;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        continue;
-      }
-      throw err; // Non-retryable error
-    }
-  }
-  throw lastError;
-}
 
 /** Get today's date string in the user's timezone (defaults to UTC). */
 function getTodayInTimezone(timezone: string): string {
@@ -148,9 +102,7 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
   errors: number;
   skipped: number;
 }> {
-  const model = config?.model ?? DEFAULT_MODEL;
   const maxCourses = config?.maxCoursesPerRun ?? 100;
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const supabase = createAdminClient();
   const rateLimiter = new RateLimiter();
   const systemPrompt = buildSystemPrompt();
@@ -159,10 +111,10 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
   let errors = 0;
   let skipped = 0;
 
-  // Get all onboarded users (include timezone for date calculations)
+  // Get all onboarded users (include timezone + preferred model)
   const { data: users, error: usersError } = await supabase
     .from('user_profiles')
-    .select('id, motivation_style, daily_study_goal_mins, timezone')
+    .select('id, motivation_style, daily_study_goal_mins, timezone, preferred_ai_model')
     .eq('onboarding_completed', true);
 
   if (usersError || !users) {
@@ -171,6 +123,7 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
 
   for (const user of users) {
     const today = getTodayInTimezone(user.timezone ?? 'UTC');
+    const userModel = config?.model ?? user.preferred_ai_model ?? DEFAULT_MODEL;
 
     // Get in_progress courses for this user
     const { data: courses, error: coursesError } = await supabase
@@ -255,13 +208,27 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
           continue;
         }
 
-        // Call GPT-4
-        const { content, tokensUsed } = await retryWithBackoff(() =>
-          callOpenAI(openai, systemPrompt, userPrompt, model)
+        // Call AI with fallback
+        const { result: aiResult, modelUsed } = await callWithFallback(
+          userModel,
+          async (modelId) => {
+            const { object, usage } = await generateObject({
+              model: getModel(modelId),
+              schema: courseAnalysisResponseSchema,
+              system: systemPrompt,
+              prompt: userPrompt,
+              temperature: 0.7,
+              maxOutputTokens: 2000,
+            });
+            return {
+              analysis: object,
+              tokensUsed: usage.totalTokens ?? estimateTokens(systemPrompt + userPrompt),
+            };
+          },
         );
 
-        // Parse and validate
-        const analysisResult = parseCourseAnalysisResponse(content);
+        const analysisResult = aiResult.analysis;
+        const tokensUsed = aiResult.tokensUsed;
 
         // Calculate adjusted risk
         const progressPercent = course.total_modules
@@ -318,9 +285,9 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
             interventions: analysisResult.interventions,
             patterns: analysisResult.patterns,
             raw_prompt: userPrompt,
-            raw_response: content,
+            raw_response: JSON.stringify(analysisResult),
             tokens_used: tokensUsed,
-            model,
+            model: modelUsed,
           });
 
         if (insertError) {
@@ -368,8 +335,6 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
   processed: number;
   errors: number;
 }> {
-  const model = config?.model ?? DEFAULT_MODEL;
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const supabase = createAdminClient();
   const rateLimiter = new RateLimiter();
   const systemPrompt = buildSystemPrompt();
@@ -395,10 +360,10 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
   let processed = 0;
   let errors = 0;
 
-  // Get all onboarded users
+  // Get all onboarded users (include preferred model)
   const { data: users, error: usersError } = await supabase
     .from('user_profiles')
-    .select('id, motivation_style, notify_weekly_report')
+    .select('id, motivation_style, notify_weekly_report, preferred_ai_model')
     .eq('onboarding_completed', true);
 
   if (usersError || !users) {
@@ -408,6 +373,8 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
   for (const user of users) {
     try {
       await rateLimiter.acquire();
+
+      const userModel = config?.model ?? user.preferred_ai_model ?? DEFAULT_MODEL;
 
       // Check for existing report for this week
       const { data: existingReport } = await supabase
@@ -508,13 +475,27 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
         continue;
       }
 
-      // Call GPT-4
-      const { content, tokensUsed } = await retryWithBackoff(() =>
-        callOpenAI(openai, systemPrompt, userPrompt, model)
+      // Call AI with fallback
+      const { result: aiResult, modelUsed } = await callWithFallback(
+        userModel,
+        async (modelId) => {
+          const { object, usage } = await generateObject({
+            model: getModel(modelId),
+            schema: weeklyReportResponseSchema,
+            system: systemPrompt,
+            prompt: userPrompt,
+            temperature: 0.7,
+            maxOutputTokens: 2000,
+          });
+          return {
+            report: object,
+            tokensUsed: usage.totalTokens ?? estimateTokens(systemPrompt + userPrompt),
+          };
+        },
       );
 
-      // Parse and validate
-      const reportResult = parseWeeklyReportResponse(content);
+      const reportResult = aiResult.report;
+      const tokensUsed = aiResult.tokensUsed;
 
       // Calculate week comparison
       const comparedToPrevious = prevWeekMinutes !== null
@@ -563,7 +544,7 @@ export async function generateWeeklyReports(config?: PipelineConfig): Promise<{
           message: `Your weekly study report for ${weekStartStr} is ready. ${summaryPreview}`,
           action_url: '/analysis/weekly',
           channels_sent: ['in_app'],
-          metadata: { week_start: weekStartStr, tokens_used: tokensUsed },
+          metadata: { week_start: weekStartStr, tokens_used: tokensUsed, model: modelUsed },
         }).select().single();
 
         // Deliver via configured channels (email, push, etc.)

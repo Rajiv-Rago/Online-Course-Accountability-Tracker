@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SUPPORTED_MODEL_IDS } from '@/lib/ai/models';
 
 // ---------------------------------------------------------------------------
 // Shared field schemas
@@ -16,6 +17,10 @@ export const profileSchema = z.object({
   experience_level: z.enum(['beginner', 'intermediate', 'advanced']),
   daily_study_goal_mins: z.number().int().min(10).max(480),
   weekly_study_goal_mins: z.number().int().min(30).max(3360),
+  preferred_ai_model: z.string().refine(
+    (val) => SUPPORTED_MODEL_IDS.includes(val),
+    { message: 'Invalid AI model' },
+  ).optional(),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
