@@ -92,6 +92,77 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Intervention → Notification bridge
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a notification for the top actionable AI intervention.
+ * Filters out low-priority and encouragement-only interventions to avoid noise.
+ * When a risk_alert was already sent for this course, only sends action/reminder
+ * interventions to avoid double-alerting on escalation type.
+ */
+async function sendInterventionNotification(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  courseId: string,
+  courseTitle: string,
+  interventions: Array<{ type: string; message: string; priority: string; action_url: string | null }>,
+  riskAlertSent: boolean,
+): Promise<void> {
+  if (!interventions.length) return;
+
+  // Filter to interventions worth notifying about:
+  // - High priority: all types
+  // - Medium priority: only action/escalation (these require user action)
+  const notifiable = interventions.filter((i) => {
+    if (i.priority === 'high') return true;
+    if (i.priority === 'medium' && (i.type === 'action' || i.type === 'escalation')) return true;
+    return false;
+  });
+
+  if (!notifiable.length) return;
+
+  // If risk_alert was already sent, only send action/reminder interventions
+  // (skip escalation to avoid double-alerting)
+  const candidates = riskAlertSent
+    ? notifiable.filter((i) => i.type === 'action' || i.type === 'reminder')
+    : notifiable;
+
+  if (!candidates.length) return;
+
+  const top = candidates[0];
+  const title =
+    top.type === 'escalation'
+      ? `Attention needed: ${courseTitle}`
+      : top.type === 'encouragement'
+        ? `Keep it up: ${courseTitle}`
+        : `Suggestion: ${courseTitle}`;
+
+  const { data: notif } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type: 'reminder',
+      title,
+      message: top.message,
+      action_url: `/analysis/${courseId}`,
+      channels_sent: ['in_app'],
+      metadata: {
+        course_id: courseId,
+        intervention_type: top.type,
+        intervention_priority: top.priority,
+        source: 'ai_intervention',
+      },
+    })
+    .select()
+    .single();
+
+  if (notif) {
+    await sendToChannels(notif).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Daily Analysis Pipeline
 // NOTE: Processes users sequentially. For large user bases (200+), consider
 // splitting into per-user queue jobs to avoid Vercel function timeouts.
@@ -296,7 +367,8 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
           processed++;
 
           // Create risk_alert notification for high or critical risk courses
-          if (risk.level === 'high' || risk.level === 'critical') {
+          const riskAlertSent = risk.level === 'high' || risk.level === 'critical';
+          if (riskAlertSent) {
             const topInsight = analysisResult.insights?.[0]?.description ?? 'Your course needs attention.';
             const { data: riskNotif } = await supabase.from('notifications').insert({
               user_id: user.id,
@@ -317,6 +389,16 @@ export async function runDailyAnalysis(config?: PipelineConfig): Promise<{
               await sendToChannels(riskNotif).catch(() => {});
             }
           }
+
+          // Send notification for top actionable AI intervention
+          await sendInterventionNotification(
+            supabase,
+            user.id,
+            course.id,
+            course.title,
+            analysisResult.interventions,
+            riskAlertSent,
+          ).catch(() => {});
         }
       } catch {
         errors++;
