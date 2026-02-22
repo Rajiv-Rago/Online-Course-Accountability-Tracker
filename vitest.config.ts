@@ -16,7 +16,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/blocks/**'],
-      exclude: ['src/blocks/**/components/**', '**/*.test.*'],
+      exclude: ['**/*.test.*'],
       reporter: ['text', 'html', 'lcov'],
     },
     include: ['src/**/*.test.{ts,tsx}'],

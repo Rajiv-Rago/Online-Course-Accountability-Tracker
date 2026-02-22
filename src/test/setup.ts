@@ -105,3 +105,35 @@ vi.mock('@/lib/ai/provider-registry', () => ({
   DEFAULT_MODEL: 'openai:gpt-4o',
   isValidModelId: vi.fn((id: string) => MOCK_MODEL_IDS.includes(id)),
 }));
+
+// ---------------------------------------------------------------------------
+// Mock sonner toast (used by ~15 components)
+// ---------------------------------------------------------------------------
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+}));
+
+// ---------------------------------------------------------------------------
+// Mock next-themes (used by B8 visualization)
+// ---------------------------------------------------------------------------
+vi.mock('next-themes', () => ({
+  useTheme: vi.fn(() => ({ resolvedTheme: 'light', setTheme: vi.fn() })),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// ---------------------------------------------------------------------------
+// Browser API mocks
+// ---------------------------------------------------------------------------
+// IntersectionObserver (used by notification-center infinite scroll)
+// Must use a class (not arrow fn) so `new IntersectionObserver(...)` works
+class MockIntersectionObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+  constructor(_callback?: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+}
+globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+
+// URL.createObjectURL (used by account-settings export)
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:test');
+globalThis.URL.revokeObjectURL = vi.fn();
