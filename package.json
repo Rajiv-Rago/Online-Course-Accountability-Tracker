@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.46",
@@ -74,6 +75,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.23",
     "jsdom": "^28.1.0",
+    "pg": "^8.18.0",
     "postcss": "^8.5.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",

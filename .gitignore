@@ -36,3 +36,10 @@ next-env.d.ts
 
 # supabase
 /supabase/.temp/
+
+# playwright
+/playwright-report/
+/test-results/
+
+# claude code
+.claude/
